@@ -1,7 +1,6 @@
 extern crate dotenv;
 
 use dotenv::dotenv;
-use reqwest::ResponseBuilderExt;
 use std::{default, env};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -25,10 +24,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
 		
 		println!("Now listening!");
 		loop {
-			let (mut stream, addr) = listener.accept().await?;
+			let (stream, _addr) = listener.accept().await?;
 			
 			tokio::spawn(async move {
-				listen(stream).await;
+				let _listen_result = listen(stream).await;
 			});
 		}
 		
@@ -48,7 +47,6 @@ async fn listen(mut stream:TcpStream)->Result<(), Box<dyn std::error::Error>>{
 	let mut headers = [httparse::EMPTY_HEADER; 64];
 	let mut req = httparse::Request::new(&mut headers);
 	let parse_result = req.parse(&buffer).unwrap();
-	
 	let byte_offset = match parse_result {
 		httparse::Status::Complete(offset) => Ok(offset),
 		httparse::Status::Partial => {
