@@ -18,3 +18,4 @@ reqwest = "0.12.8"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.117"
 tokio = { version = "1.40.0", features = ["full"] }
+custom-tcp-listener = { git = "https://lgubislig.app/gitea/johnsonjaurigue/custom_tcp_listener.git" }
