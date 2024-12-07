@@ -36,7 +36,7 @@ pub async fn route_to_service_handler (request:Request, tcp_stream: TcpStream) -
 			"$limit": 1
 		}
 	];
-	let mut route_collection = MongoCollections::Routes.as_collection::<ServiceRoute>().aggregate(pipeline).await?;
+	let mut route_collection = MongoCollections::Routes.as_collection::<ServiceRoute>().aggregate(pipeline).with_type::<ServiceRoute>().await?;
 	while route_collection.advance().await? {
 		println!("{:#?}", route_collection.deserialize_current())
 	}
