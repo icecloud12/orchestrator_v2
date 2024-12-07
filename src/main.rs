@@ -51,7 +51,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
 		_ => {
 			panic!("One of the environment variables are not set");
 		}
- 	}
+ 	};
+	//there is no way shape or form this would miss
 	let mut router = Router::new()
 		.route("/*".to_string(), connect(route_to_service_handler))
 		.route("/*".to_string(), get(route_to_service_handler))
