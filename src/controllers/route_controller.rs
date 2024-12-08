@@ -4,7 +4,7 @@ use crate::{models::service_route_model::ServiceRoute, utils::mongodb_utils::Mon
 
 
 
-pub async fn route_resolver(uri_string: String) -> Result<Option<ServiceRoute>, Box< dyn std::error::Error>>{
+pub async fn route_resolver(uri_string: String) -> Result<Option<ServiceRoute>, String>{
 	println!("uri_string: {}",uri_string);
 	let pipeline = vec![
 		doc!{
@@ -31,14 +31,24 @@ pub async fn route_resolver(uri_string: String) -> Result<Option<ServiceRoute>, 
 			"$limit": 1
 		}
 	];
-	let mut route_collection = MongoCollections::Routes.as_collection::<ServiceRoute>().aggregate(pipeline).with_type::<Option<ServiceRoute>>().await?; //resolves at max 1 route
-	let mut service_route : Option<ServiceRoute> = None;
-	if route_collection.advance().await? {
-		if let Ok(deserialized_content) = route_collection.deserialize_current() {
-			service_route = deserialized_content;
-		}else{
-			println!("Could not properly deserialize route for {}", uri_string);
-		}
+	let route_collection_result = MongoCollections::Routes.as_collection::<ServiceRoute>().aggregate(pipeline).with_type::<Option<ServiceRoute>>().await; //resolves at max 1 route
+	match route_collection_result {
+		Ok(mut route_collection) => {
+			match route_collection.advance().await {
+				Ok(advance_result) => {
+					if advance_result {
+						if let Ok(deserialized_content) = route_collection.deserialize_current() {
+							Ok(deserialized_content)
+						}else{
+							Ok(None)
+						}
+					}else{
+						Ok(None)
+					}
+				},
+				Err(err) => Err(err.to_string()),
+			}
+		},
+		Err(err) => Err(err.to_string()),
 	}
-	Ok(service_route)
 }
