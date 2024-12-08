@@ -37,7 +37,7 @@ pub async fn get_or_init_load_balancer(mongo_image: ObjectId, address: String) -
 				None => {
 					drop(hm);
 					let lb_find_result = MongoCollections::LoadBalancers.as_collection::<LoadBalancerEntry>().find_one(doc!{
-						"mongo_image_reference" : &service_image_entry.docker_image_id
+						"mongo_image_reference" : &service_image_entry._id
 					}).await?;
 
 					let lb_ref = match lb_find_result	 {
