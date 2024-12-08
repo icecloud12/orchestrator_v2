@@ -1,11 +1,16 @@
 extern crate dotenv;
 
+use controllers::load_balancer_controller::{self, LOADBALANCERS};
 use custom_tcp_listener::models::listener::bind;
 use custom_tcp_listener::models::route::{connect, delete, get, head, option, patch, post, put, trace};
 use custom_tcp_listener::models::router::Router;
 use dotenv::dotenv;
-use handlers::orchestrator_handler::{route_to_service_handler};
+use handlers::route_to_service_handler::{route_to_service_handler};
+use tokio::sync::Mutex;
 use utils::mongodb_utils;
+
+use std::collections::HashMap;
+use std::sync::Arc;
 use std::{default, env};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -14,6 +19,7 @@ use http::Response;
 mod models;
 mod handlers;
 mod utils;
+mod controllers;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>>{
 	dotenv().ok();
@@ -52,6 +58,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
 			panic!("One of the environment variables are not set");
 		}
  	};
+
+	load_balancer_controller::init();
+
 	//there is no way shape or form this would miss
 	let mut router = Router::new()
 		.route("/*".to_string(), connect(route_to_service_handler))

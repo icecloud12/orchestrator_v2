@@ -4,9 +4,9 @@ use serde_json::Number;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct ServiceRoute {
-	_id: ObjectId,
-	mongo_image: ObjectId, // a reference to the image,
-	address: String, //prefix of the service
-	exposed_port: String,// port where the service within the container would listen,
-	segments: usize
+	pub _id: ObjectId,
+	pub mongo_image: ObjectId, // a reference to the image,
+	pub address: String, //prefix of the service
+	pub exposed_port: String,// port where the service within the container would listen,
+	pub segments: usize
 }
