@@ -8,3 +8,5 @@ pub struct DockerContainer {
 	container_id: String, // docker internal id of the docker container
 	public_port: usize, //
 }
+
+pub type DockerImageId = String;

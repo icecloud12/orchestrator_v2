@@ -4,7 +4,7 @@ use custom_tcp_listener::models::{router::response_to_bytes, types::Request};
 use http::StatusCode;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
-use crate::{controllers::{load_balancer_controller::get_or_init_load_balancer, route_controller::route_resolver}, models::service_route_model::ServiceRoute};
+use crate::{controllers::{load_balancer_controller::{get_or_init_load_balancer, LOADBALANCERS}, route_controller::route_resolver}, models::{docker_container_models::DockerImageId, service_route_model::ServiceRoute}, utils::mongodb_utils::DATABASE};
 
 
 pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStream) -> Result<(), Box<dyn Error>> {
@@ -15,8 +15,13 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 			match t1 {
 				Some(t2) => {
 					let ServiceRoute {mongo_image, address, ..} = t2;
-					let lb = get_or_init_load_balancer(mongo_image,address).await;
-					// println!("{:#?}", lb);
+					let lb = get_or_init_load_balancer(mongo_image,address).await.unwrap();
+
+					let hm = LOADBALANCERS.get().unwrap().lock().await;
+					
+					println!("{:#?}", &hm.get(&lb));
+					drop(hm);
+
 				},
 				None => {
 						let body: &[u8] = &Vec::new();
