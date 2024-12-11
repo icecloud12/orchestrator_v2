@@ -16,12 +16,6 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 				Some(t2) => {
 					let ServiceRoute {mongo_image, address, ..} = t2;
 					let lb = get_or_init_load_balancer(mongo_image,address).await.unwrap();
-
-					let hm = LOADBALANCERS.get().unwrap().lock().await;
-					
-					println!("{:#?}", &hm.get(&lb));
-					drop(hm);
-
 				},
 				None => {
 						let body: &[u8] = &Vec::new();

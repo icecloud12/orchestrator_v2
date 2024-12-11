@@ -23,7 +23,10 @@ impl ToString for ELoadBalancerBehavior {
 pub fn init(){
 	LOADBALANCERS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())));
 }
-
+///This function returns the load_balancer key and does 3 things:
+/// 1. if locally cached then returns the key directly
+/// 2. if not, rebuild it from the database record if it exists there
+/// 3. last case. create a new one. Save it locally and in db
 pub async fn get_or_init_load_balancer(mongo_image: ObjectId, address: String) -> Result<DockerImageId, String>{
 	//get the image first
 	let find_one_result = MongoCollections::Images.as_collection::<ServiceImage>().find_one(doc!{
