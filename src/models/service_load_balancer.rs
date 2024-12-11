@@ -6,6 +6,8 @@ use tokio::sync::Mutex;
 
 use crate::controllers::load_balancer_controller::ELoadBalancerBehavior;
 
+use super::service_container_models::ServiceContainer;
+
 #[derive(Debug)]
 //this struct represents the load balancer of the current program
 pub struct ServiceLoadBalancer {
@@ -13,7 +15,7 @@ pub struct ServiceLoadBalancer {
     pub address: String,
     pub head: Arc<Mutex<usize>>,//current head pointer of the load_balancer
     pub behavior: ELoadBalancerBehavior,
-    pub containers: Arc<Mutex<Vec<ObjectId>>>, //docker_container_id_instances
+    pub containers: Arc<Mutex<Vec<ServiceContainer>>>, //docker_container_id_instances
     pub validated: Arc<Mutex<bool>>, //initially false to let the program know if the containers are checke
 }
 
@@ -28,7 +30,7 @@ pub struct LoadBalancerEntryAggregate {
     pub mongo_image_reference:ObjectId, //mongo_image_reference
     pub head: usize,
     pub behavior: String,
-	pub containers: Vec<ObjectId>
+	pub containers: Vec<ServiceContainer>
 }
 
 #[derive(Deserialize, Serialize)]

@@ -6,7 +6,7 @@ use custom_tcp_listener::models::route::{connect, delete, get, head, option, pat
 use custom_tcp_listener::models::router::Router;
 use dotenv::dotenv;
 use handlers::route_to_service_handler::{route_to_service_handler};
-use utils::mongodb_utils;
+use utils::{docker_utils, mongodb_utils};
 use std::{env};
 
 mod models;
@@ -28,6 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
 			match(env::var("DEV_DATABASE_URI"), env::var("DEV_DATABASE_NAME"), env::var("DEV_LISTENING_ADDRESS"), env::var("DEV_LISTENING_PORT")) {
 				(Ok(d_d_uri), Ok(d_d_name), Ok(d_l_address), Ok(d_l_port)) => {
 					(database_uri, database_name, listening_address, listening_port) = (d_d_uri, d_d_name, d_l_address, d_l_port);
+					docker_utils::connect();
 					mongodb_utils::connect(database_uri, database_name).await?;
 				},
 				_ => {
@@ -40,6 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
 			match(env::var("PROD_DATABASE_URI"), env::var("PROD_DATABASE_NAME"), env::var("PROD_LISTENING_ADDRESS"), env::var("PROD_LISTENING_PORT")) {
 				(Ok(p_d_uri), Ok(p_d_name), Ok(p_l_address), Ok(p_l_port)) => {
 					(database_uri, database_name, listening_address, listening_port) = (p_d_uri, p_d_name, p_l_address, p_l_port);
+					docker_utils::connect();
 					mongodb_utils::connect(database_uri, database_name).await?;
 				},
 				_ => {

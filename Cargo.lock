@@ -1339,6 +1339,7 @@ dependencies = [
  "hyper",
  "log",
  "mongodb",
+ "rand",
  "regex",
  "reqwest",
  "serde",
