@@ -8,7 +8,7 @@ use crate::{models::service_container_models::{ServiceContainer, ServiceContaine
 
 
 ///load_balancer_key is the docker_image_id
-pub async fn create_container(load_balancer_key: String, exposed_port: String) -> Result<ServiceContainer, String>{
+pub async fn create_container(docker_image_id: &String, exposed_port: &String) -> Result<ServiceContainer, String>{
 	//create docker container
 
 	let docker = DOCKER.get().unwrap();
@@ -30,7 +30,7 @@ pub async fn create_container(load_balancer_key: String, exposed_port: String) -
 		..Default::default()
 	};
 	let config = Config {
-		image: Some(load_balancer_key.clone()),
+		image: Some(docker_image_id.to_owned()),
 		host_config: Some(host_config),
 		..Default::default()
 	};

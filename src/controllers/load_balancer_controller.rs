@@ -30,7 +30,7 @@ pub fn init(){
 /// 1. if locally cached then returns the key directly
 /// 2. if not, rebuild it from the database record if it exists there
 /// 3. last case. create a new one. Save it locally and in db
-pub async fn get_or_init_load_balancer(mongo_image: ObjectId, address: String) -> Result<DockerImageId, String>{
+pub async fn get_or_init_load_balancer(mongo_image: ObjectId, address: String, exposed_port: String) -> Result<DockerImageId, String>{
 	//get the image first
 	let find_one_result = MongoCollections::Images.as_collection::<ServiceImage>().find_one(doc!{
 		"_id" : mongo_image
@@ -125,6 +125,7 @@ pub async fn get_or_init_load_balancer(mongo_image: ObjectId, address: String) -
 														containers: Arc::new(Mutex::new(lb_ref.containers)),
 														validated: Arc::new(Mutex::new(false)),
                 										docker_image_id: service_image_entry.docker_image_id.clone(),
+														exposed_port
 													});
 												},
 												Err(_) => todo!(),

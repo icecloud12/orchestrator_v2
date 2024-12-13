@@ -15,11 +15,11 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 			match t1 {
 				Some(t2) => {
 					let ServiceRoute {mongo_image, address, exposed_port, ..} = t2;
-					let lb_key = get_or_init_load_balancer(mongo_image,address).await.unwrap();
+					let lb_key = get_or_init_load_balancer(mongo_image,address,exposed_port).await.unwrap();
 
 					let mut lb_hm = LOADBALANCERS.get().unwrap().lock().await;
 					let lb= lb_hm.get_mut(&lb_key).unwrap();
-					let exposed_port = lb.next_container(lb_key).await;
+					let exposed_port = lb.next_container().await;
 					//let next_container_result = next_container(lb, ).await;
 					// match next_container_result {
 					// 	Ok(next_container_port) => {

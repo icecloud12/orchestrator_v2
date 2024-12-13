@@ -4,7 +4,7 @@ use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use crate::controllers::load_balancer_controller::{ELoadBalancerBehavior, LOADBALANCERS};
+use crate::{controllers::{container_controller, load_balancer_controller::{ELoadBalancerBehavior, LOADBALANCERS}}, utils::mongodb_utils::MongoCollections};
 
 use super::service_container_models::ServiceContainer;
 
@@ -13,6 +13,7 @@ use super::service_container_models::ServiceContainer;
 pub struct ServiceLoadBalancer {
     pub _id: ObjectId, //mongo_db_load_balancer_instance,
     pub docker_image_id: String,
+    pub exposed_port: String,
     pub address: String,
     pub head: Arc<Mutex<usize>>,//current head pointer of the load_balancer
     pub behavior: ELoadBalancerBehavior,
@@ -24,23 +25,42 @@ impl ServiceLoadBalancer {
     ///the container array size differ depending on:
     /// 1. if it's newly created
     /// 2. the recorded load_balancer in the database have/have no entries
-    pub async fn next_container(&mut self, load_balancer_key:String) -> Option<usize>
+    pub async fn next_container(&self) -> Result<usize, String>
     {
         let containers = &self.containers;
         let containers_lock = containers.lock().await;
         let container_len = containers_lock.len();
         
         let ret  = if container_len == 0 {
-            None
+            let create_container_result = self.create_container().await;
+            //maybe create some logic before creating the container here for scalability logic
+            match create_container_result {
+                Ok(container_port) => Ok(container_port),
+                Err(err) => Err(err),
+            }
         }else{//has container entries
             //move the head
             let head = &self.head;
             let mut num = head.lock().await;
             *num = (*num + 1) % container_len;
             
-            Some(containers_lock.get(*num).unwrap().public_port.clone())
+            Ok(containers_lock.get(*num).unwrap().public_port.clone())
         };
         ret
+    }
+
+    pub async fn create_container(&self) -> Result<usize, String>{
+        let col = container_controller::create_container(&self.docker_image_id, &self.exposed_port).await;
+        match col {   
+            Ok(service_container) => {
+                let containers = &self.containers;
+                let mut container_lock = containers.lock().await;
+                let container_port = service_container.public_port;
+                container_lock.push(service_container);
+                Ok(container_port)
+            },
+            Err(err) => Err(err),
+        }
     }
 }
 
