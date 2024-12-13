@@ -30,8 +30,8 @@ impl ServiceLoadBalancer {
         let containers = &self.containers;
         let containers_lock = containers.lock().await;
         let container_len = containers_lock.len();
-        
-        let ret  = if container_len == 0 {
+        drop(containers_lock);
+        let ret: Result<usize, String>  = if container_len == 0 {
             let create_container_result = self.create_container().await;
             //maybe create some logic before creating the container here for scalability logic
             match create_container_result {
@@ -40,6 +40,7 @@ impl ServiceLoadBalancer {
             }
         }else{//has container entries
             //move the head
+			let containers_lock = containers.lock().await;
             let head = &self.head;
             let mut num = head.lock().await;
             *num = (*num + 1) % container_len;

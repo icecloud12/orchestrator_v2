@@ -1,10 +1,9 @@
 use std::error::Error;
 
-use custom_tcp_listener::models::{router::response_to_bytes, types::Request};
-use http::StatusCode;
-use tokio::{io::AsyncWriteExt, net::TcpStream};
+use custom_tcp_listener::models::types::Request;
+use tokio::net::TcpStream;
 
-use crate::{controllers::{load_balancer_controller::{get_or_init_load_balancer, LOADBALANCERS}, route_controller::route_resolver}, models::{service_container_models::DockerImageId, service_load_balancer::ServiceLoadBalancer, service_route_model::ServiceRoute}, utils::mongodb_utils::DATABASE};
+use crate::{controllers::{load_balancer_controller::{get_or_init_load_balancer, LOADBALANCERS}, route_controller::route_resolver}, models::service_route_model::ServiceRoute, utils::orchestrator_utils::{return_404, return_500}};
 
 
 pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStream) -> Result<(), Box<dyn Error>> {
@@ -19,37 +18,22 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 
 					let mut lb_hm = LOADBALANCERS.get().unwrap().lock().await;
 					let lb= lb_hm.get_mut(&lb_key).unwrap();
-					let exposed_port = lb.next_container().await;
-					//let next_container_result = next_container(lb, ).await;
-					// match next_container_result {
-					// 	Ok(next_container_port) => {
-					// 		println!("next_container_port: {}", next_container_port);
-					// 	},
-					// 	Err(err) => {
-					// 		println!("Return internal server error: {:#?}", err);
-					// 	},
-					// }
+					let next_container_result = lb.next_container().await;
+					match next_container_result {
+						Ok(container_public_port) => {
+							//forward the request here to the port 
+						},
+						Err(message) => {return_500(tcp_stream, message).await;},
+					};
 				},
 				None => {
-						let body: &[u8] = &Vec::new();
-						let response_builder = http::Response::builder().status(StatusCode::NOT_FOUND).body(body).unwrap();
-						let response_bytes = response_to_bytes(response_builder);
-						let _write_result = tcp_stream.write_all(&response_bytes).await;
-						let _flush_result = tcp_stream.flush().await;
+					return_404(tcp_stream).await;
 				},
 			}
 		},
 		Err(err) => {
-			//throw internal server error
+			return_500(tcp_stream, err).await;
 		},
 	};
-	// if resolved_service.is_some() {
-	// 	//code here for forwarding the request
-		
-	// }else{
-	// 	//return a 404
-	
-	// }
-	
 	Ok(())	
 }

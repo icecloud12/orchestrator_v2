@@ -53,9 +53,8 @@ pub async fn create_container(docker_image_id: &String, exposed_port: &String) -
 			}
 			
 		},
-		Err(err) => {
-			println!("{:#?}", err);
-			exit(0x0100);
+		Err(err ) => {
+			Err(format!("Docker Create Container Error: {:#?}", err))
 		}
 	}
 }

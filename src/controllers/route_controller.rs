@@ -5,7 +5,6 @@ use crate::{models::service_route_model::ServiceRoute, utils::mongodb_utils::Mon
 
 
 pub async fn route_resolver(uri_string: String) -> Result<Option<ServiceRoute>, String>{
-	println!("uri_string: {}",uri_string);
 	let pipeline = vec![
 		doc!{
 			"$match": {

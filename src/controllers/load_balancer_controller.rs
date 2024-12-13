@@ -140,7 +140,6 @@ pub async fn get_or_init_load_balancer(mongo_image: ObjectId, address: String, e
 									}
 								}
 								Err(err) => { // mongodb error
-									println!("{:#?}", err); //internal server here
 									Err(err.to_string())
 								},
 							}

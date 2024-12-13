@@ -1328,7 +1328,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "orchestrator_container_ready_mq"
+name = "orchestrator_v2"
 version = "0.1.0"
 dependencies = [
  "bollard",
