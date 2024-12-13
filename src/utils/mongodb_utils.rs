@@ -16,7 +16,8 @@ pub enum MongoCollections {
 	Images,
 	Containers,
 	LoadBalancers,
-	Routes
+	Routes,
+	LoadBalancerContainerJunction
 }
 
 //sadly we cannot definite them early as the Generic is used to Serialize and Deserialize the document props.
@@ -31,6 +32,7 @@ impl MongoCollections {
 			MongoCollections::Containers => "containers".to_string(),
 			MongoCollections::LoadBalancers => "load_balancers".to_string(),
 			MongoCollections::Routes => "routes".to_string(),
+			MongoCollections::LoadBalancerContainerJunction => "load_balancer_container_junction".to_string()
 		}
 	}
 }

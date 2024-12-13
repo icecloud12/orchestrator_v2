@@ -1,10 +1,11 @@
 use std::{ops::DerefMut, sync::Arc};
 
+use bollard::service;
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use crate::{controllers::{container_controller, load_balancer_controller::{ELoadBalancerBehavior, LOADBALANCERS}}, utils::mongodb_utils::MongoCollections};
+use crate::controllers::{container_controller, load_balancer_container_junction, load_balancer_controller::ELoadBalancerBehavior};
 
 use super::service_container_models::ServiceContainer;
 
@@ -52,8 +53,10 @@ impl ServiceLoadBalancer {
 
     pub async fn create_container(&self) -> Result<usize, String>{
         let col = container_controller::create_container(&self.docker_image_id, &self.exposed_port).await;
+		
         match col {   
             Ok(service_container) => {
+				let _ = load_balancer_container_junction::create(&self._id, &service_container._id).await;
                 let containers = &self.containers;
                 let mut container_lock = containers.lock().await;
                 let container_port = service_container.public_port;
