@@ -11,7 +11,8 @@ use super::service_container_models::ServiceContainer;
 #[derive(Debug)]
 //this struct represents the load balancer of the current program
 pub struct ServiceLoadBalancer {
-    pub _id: ObjectId, //mongo_db_load_balancer_instance
+    pub _id: ObjectId, //mongo_db_load_balancer_instance,
+    pub docker_image_id: String,
     pub address: String,
     pub head: Arc<Mutex<usize>>,//current head pointer of the load_balancer
     pub behavior: ELoadBalancerBehavior,

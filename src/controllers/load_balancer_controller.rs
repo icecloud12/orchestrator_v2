@@ -124,6 +124,7 @@ pub async fn get_or_init_load_balancer(mongo_image: ObjectId, address: String) -
 														behavior: ELoadBalancerBehavior::RoundRobin,
 														containers: Arc::new(Mutex::new(lb_ref.containers)),
 														validated: Arc::new(Mutex::new(false)),
+                										docker_image_id: service_image_entry.docker_image_id.clone(),
 													});
 												},
 												Err(_) => todo!(),
