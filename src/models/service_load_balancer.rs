@@ -1,10 +1,10 @@
-use std::sync::Arc;
+use std::{ops::DerefMut, sync::Arc};
 
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use crate::controllers::load_balancer_controller::ELoadBalancerBehavior;
+use crate::controllers::load_balancer_controller::{ELoadBalancerBehavior, LOADBALANCERS};
 
 use super::service_container_models::ServiceContainer;
 
@@ -19,6 +19,29 @@ pub struct ServiceLoadBalancer {
     pub validated: Arc<Mutex<bool>>, //initially false to let the program know if the containers are checke
 }
 
+impl ServiceLoadBalancer {
+    ///the container array size differ depending on:
+    /// 1. if it's newly created
+    /// 2. the recorded load_balancer in the database have/have no entries
+    pub async fn next_container(&mut self, load_balancer_key:String) -> Option<usize>
+    {
+        let containers = &self.containers;
+        let containers_lock = containers.lock().await;
+        let container_len = containers_lock.len();
+        
+        let ret  = if container_len == 0 {
+            None
+        }else{//has container entries
+            //move the head
+            let head = &self.head;
+            let mut num = head.lock().await;
+            *num = (*num + 1) % container_len;
+            
+            Some(containers_lock.get(*num).unwrap().public_port.clone())
+        };
+        ret
+    }
+}
 
 //this struct represents the data from mongodb
 //will be used to quickly restore the load-balancers from the old state just incase 

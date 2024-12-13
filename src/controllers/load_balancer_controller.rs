@@ -155,39 +155,3 @@ pub async fn get_or_init_load_balancer(mongo_image: ObjectId, address: String) -
 	
 	//Ok(result)
 }
-
-///the container array size differ depending on:
-/// 1. if it's newly created
-/// 2. the recorded load_balancer in the database have/have no entries
-pub async fn next_container(load_balancer_key:String, exposed_port:String) -> Result<usize, String> {
-	let lb_s = LOADBALANCERS.get().unwrap().lock().await;
-	//cannot be option by service logic
-	let mut lb_entry = lb_s.get(&load_balancer_key).unwrap();
-	//check container length
-	let mut containers = lb_entry.containers.lock().await;
-	
-	let container = if containers.len() == 0 {
-		//create a container instance
-		let new_container= create_container(load_balancer_key, exposed_port).await;
-		
-		match new_container {
-			Ok(service_container) => {
-				let port = service_container.public_port.clone();
-				containers.push(service_container);
-				Ok(port)
-			},
-			Err(err) => {
-				
-				Err(err)
-			}
-		}
-		
-	}else{//has container entries
-		//move the head
-		let mut head = lb_entry.head.lock().await;
-		*head = (*head + 1) % containers.len();
-		Ok(containers.get(*head).unwrap().public_port.clone())
-	};
-	drop(containers);
-	container
-}
