@@ -1,6 +1,4 @@
-use std::{ops::DerefMut, sync::Arc};
-
-use bollard::service;
+use std::sync::Arc;
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -16,7 +14,7 @@ pub struct ServiceLoadBalancer {
     pub docker_image_id: String,
     pub exposed_port: String,
     pub address: String,
-    pub head: Arc<Mutex<usize>>,//current head pointer of the load_balancer
+    pub head: usize,//current head pointer of the load_balancer
     pub behavior: ELoadBalancerBehavior,
     pub containers: Arc<Mutex<Vec<ServiceContainer>>>, //docker_container_id_instances
     pub validated: Arc<Mutex<bool>>, //initially false to let the program know if the containers are checke
@@ -26,7 +24,7 @@ impl ServiceLoadBalancer {
     ///the container array size differ depending on:
     /// 1. if it's newly created
     /// 2. the recorded load_balancer in the database have/have no entries
-    pub async fn next_container(&self) -> Result<usize, String>
+    pub async fn next_container(&mut self) -> Result<usize, String>
     {
         let containers = &self.containers;
         let containers_lock = containers.lock().await;
@@ -42,11 +40,9 @@ impl ServiceLoadBalancer {
         }else{//has container entries
             //move the head
 			let containers_lock = containers.lock().await;
-            let head = &self.head;
-            let mut num = head.lock().await;
-            *num = (*num + 1) % container_len;
-            
-            Ok(containers_lock.get(*num).unwrap().public_port.clone())
+            let head =  &mut self.head;
+            *head = (*head + 1) % container_len;
+            Ok(containers_lock.get(*head).unwrap().public_port.clone())
         };
         ret
     }

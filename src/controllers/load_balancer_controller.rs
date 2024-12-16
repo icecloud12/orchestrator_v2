@@ -120,7 +120,7 @@ pub async fn get_or_init_load_balancer(mongo_image: ObjectId, address: String, e
 														service_image_entry.docker_image_id.clone(), ServiceLoadBalancer {
 														_id: lb_ref._id,
 														address: address,
-														head: Arc::new(Mutex::new(lb_ref.head)),
+														head: lb_ref.head,
 														behavior: ELoadBalancerBehavior::RoundRobin,
 														containers: Arc::new(Mutex::new(lb_ref.containers)),
 														validated: Arc::new(Mutex::new(false)),
