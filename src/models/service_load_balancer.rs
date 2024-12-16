@@ -17,7 +17,7 @@ pub struct ServiceLoadBalancer {
     pub head: usize,//current head pointer of the load_balancer
     pub behavior: ELoadBalancerBehavior,
     pub containers: Vec<ServiceContainer>, //docker_container_id_instances
-    pub validated: Arc<Mutex<bool>>, //initially false to let the program know if the containers are checke
+    pub validated: bool, //initially false to let the program know if the containers are checke
 }
 
 impl ServiceLoadBalancer {
