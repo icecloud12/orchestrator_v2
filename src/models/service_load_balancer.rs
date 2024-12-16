@@ -16,7 +16,7 @@ pub struct ServiceLoadBalancer {
     pub address: String,
     pub head: usize,//current head pointer of the load_balancer
     pub behavior: ELoadBalancerBehavior,
-    pub containers: Arc<Mutex<Vec<ServiceContainer>>>, //docker_container_id_instances
+    pub containers: Vec<ServiceContainer>, //docker_container_id_instances
     pub validated: Arc<Mutex<bool>>, //initially false to let the program know if the containers are checke
 }
 
@@ -27,9 +27,8 @@ impl ServiceLoadBalancer {
     pub async fn next_container(&mut self) -> Result<usize, String>
     {
         let containers = &self.containers;
-        let containers_lock = containers.lock().await;
-        let container_len = containers_lock.len();
-        drop(containers_lock);
+        
+        let container_len = containers.len();
         let ret: Result<usize, String>  = if container_len == 0 {
             let create_container_result = self.create_container().await;
             //maybe create some logic before creating the container here for scalability logic
@@ -39,24 +38,23 @@ impl ServiceLoadBalancer {
             }
         }else{//has container entries
             //move the head
-			let containers_lock = containers.lock().await;
             let head =  &mut self.head;
             *head = (*head + 1) % container_len;
-            Ok(containers_lock.get(*head).unwrap().public_port.clone())
+			let public_port = containers.get(*head).unwrap().public_port.clone();
+            Ok(public_port)
         };
         ret
     }
 
-    pub async fn create_container(&self) -> Result<usize, String>{
+    pub async fn create_container(&mut self) -> Result<usize, String>{
         let col = container_controller::create_container(&self.docker_image_id, &self.exposed_port).await;
 		
         match col {   
             Ok(service_container) => {
 				let _ = load_balancer_container_junction::create(&self._id, &service_container._id).await;
-                let containers = &self.containers;
-                let mut container_lock = containers.lock().await;
+                let containers = &mut self.containers;
                 let container_port = service_container.public_port;
-                container_lock.push(service_container);
+                containers.push(service_container);
                 Ok(container_port)
             },
             Err(err) => Err(err),
