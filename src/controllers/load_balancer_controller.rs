@@ -10,6 +10,7 @@ use super::container_controller::create_container;
 
 
 pub static LOADBALANCERS: OnceLock<Arc<Mutex<HashMap<DockerImageId, ServiceLoadBalancer>>>> = OnceLock::new();
+pub static AWAITED_CONTAINERS: OnceLock<Arc<Mutex<HashMap<String, String>>>> = OnceLock::new();
 #[derive(Debug)]
 pub enum ELoadBalancerBehavior {
     RoundRobin
@@ -18,13 +19,28 @@ pub enum ELoadBalancerBehavior {
 impl ToString for ELoadBalancerBehavior {
     fn to_string(&self) -> String {
         match &self {
-            &Self::RoundRobin => "round_robin".to_string()
+            ELoadBalancerBehavior::RoundRobin => "round_robin".to_string()
         }
     }
+}
+#[derive(Debug)]
+pub enum ELoadBalancerMode {
+    FORWARD,
+    QUEUE
+}
+
+impl ToString for ELoadBalancerMode {
+	fn to_string(&self) -> String {
+		match &self {
+			ELoadBalancerMode::FORWARD => "forward".to_string(),
+			ELoadBalancerMode::QUEUE => "queue".to_string(),
+		}
+	}
 }
 
 pub fn init(){
 	LOADBALANCERS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())));
+	AWAITED_CONTAINERS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())));
 }
 ///This function returns the load_balancer key and does 3 things:
 /// 1. if locally cached then returns the key directly
@@ -125,13 +141,16 @@ pub async fn get_or_init_load_balancer(mongo_image: ObjectId, address: String, e
 														containers: lb_ref.containers,
 														validated: false,
                 										docker_image_id: service_image_entry.docker_image_id.clone(),
-														exposed_port
+														exposed_port,
+                										mode: ELoadBalancerMode::QUEUE,
+														tcp_queue: Vec::new() 
 													});
+													Ok(service_image_entry.docker_image_id)
 												},
-												Err(_) => todo!(),
+												Err(err) => Err(err),
 											}
 											
-											Ok(service_image_entry.docker_image_id)
+											
 										},
 										Err(advance_error) => { // mongodb error
 											//internal server error

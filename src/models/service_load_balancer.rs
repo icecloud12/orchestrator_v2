@@ -1,11 +1,12 @@
-use std::sync::Arc;
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
+use tokio::net::TcpStream;
 
-use crate::controllers::{container_controller, load_balancer_container_junction, load_balancer_controller::ELoadBalancerBehavior};
+use crate::controllers::{container_controller, load_balancer_container_junction, load_balancer_controller::{ELoadBalancerBehavior, ELoadBalancerMode, AWAITED_CONTAINERS}};
 
 use super::service_container_models::ServiceContainer;
+
+
 
 #[derive(Debug)]
 //this struct represents the load balancer of the current program
@@ -16,26 +17,29 @@ pub struct ServiceLoadBalancer {
     pub address: String,
     pub head: usize,//current head pointer of the load_balancer
     pub behavior: ELoadBalancerBehavior,
+    pub mode: ELoadBalancerMode,
     pub containers: Vec<ServiceContainer>, //docker_container_id_instances
-    pub validated: bool, //initially false to let the program know if the containers are checke
+    pub validated: bool, //initially false to let the program know if the containers are checke,
+    pub tcp_queue: Vec<TcpStream>
 }
 
 impl ServiceLoadBalancer {
     ///the container array size differ depending on:
     /// 1. if it's newly created
     /// 2. the recorded load_balancer in the database have/have no entries
-    pub async fn next_container(&mut self) -> Result<usize, String>
+    pub async fn next_container(&mut self) -> Result<usize, ()>
     {
         let containers = &self.containers;
         
         let container_len = containers.len();
-        let ret: Result<usize, String>  = if container_len == 0 {
-            let create_container_result = self.create_container().await;
-            //maybe create some logic before creating the container here for scalability logic
-            match create_container_result {
-                Ok(container_port) => Ok(container_port),
-                Err(err) => Err(err),
-            }
+        let ret: Result<usize, ()>  = if container_len == 0 {
+            // let create_container_result = self.create_container().await;
+            // //maybe create some logic before creating the container here for scalability logic
+            // match create_container_result {
+            //     Ok(container_port) => Ok(container_port),
+            //     Err(err) => Err(err),
+            // }
+            Err(())
         }else{//has container entries
             //move the head
             let head =  &mut self.head;
@@ -48,9 +52,12 @@ impl ServiceLoadBalancer {
 
     pub async fn create_container(&mut self) -> Result<usize, String>{
         let col = container_controller::create_container(&self.docker_image_id, &self.exposed_port).await;
-		
+        
         match col {   
             Ok(service_container) => {
+                let mut lock  = AWAITED_CONTAINERS.get().unwrap().lock().await;
+                lock.insert(service_container.container_id.clone(), self.docker_image_id.clone());
+                drop(lock);
 				let _ = load_balancer_container_junction::create(&self._id, &service_container._id).await;
                 let containers = &mut self.containers;
                 let container_port = service_container.public_port;
@@ -59,6 +66,9 @@ impl ServiceLoadBalancer {
             },
             Err(err) => Err(err),
         }
+    }
+    pub fn queue_stream(&mut self, tcp_stream: TcpStream) {
+        self.tcp_queue.push(tcp_stream);
     }
 }
 
