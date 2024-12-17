@@ -50,7 +50,7 @@ impl ServiceLoadBalancer {
         ret
     }
 
-    pub async fn create_container(&mut self) -> Result<usize, String>{
+    pub async fn create_container(&mut self) -> Result<ServiceContainer, String>{
         let col = container_controller::create_container(&self.docker_image_id, &self.exposed_port).await;
         
         match col {   
@@ -59,10 +59,7 @@ impl ServiceLoadBalancer {
                 lock.insert(service_container.container_id.clone(), self.docker_image_id.clone());
                 drop(lock);
 				let _ = load_balancer_container_junction::create(&self._id, &service_container._id).await;
-                let containers = &mut self.containers;
-                let container_port = service_container.public_port;
-                containers.push(service_container);
-                Ok(container_port)
+                Ok(service_container)
             },
             Err(err) => Err(err),
         }
@@ -70,6 +67,10 @@ impl ServiceLoadBalancer {
     pub fn queue_stream(&mut self, tcp_stream: TcpStream) {
         self.tcp_queue.push(tcp_stream);
     }
+	pub fn add_container(&mut self, container: ServiceContainer) {
+		let containers = &mut self.containers;
+		containers.push(container);
+	}
 }
 
 //this struct represents the data from mongodb

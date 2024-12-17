@@ -1,14 +1,14 @@
-use std::error::Error;
+use std::{error::Error, str::FromStr};
 
 use custom_tcp_listener::models::types::Request;
-use tokio::net::TcpStream;
+use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::{controllers::{load_balancer_controller::{get_or_init_load_balancer, ELoadBalancerMode, LOADBALANCERS}, route_controller::route_resolver}, models::service_route_model::ServiceRoute, utils::orchestrator_utils::{return_404, return_500}};
 
 
 pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStream) -> Result<(), Box<dyn Error>> {
 	
-	let resolved_service = route_resolver(request.path).await;
+	let resolved_service = route_resolver(request.path.clone()).await;
 	match resolved_service {
 		Ok(t1) => {
 			match t1 {
@@ -24,12 +24,51 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 								Ok(container_public_port) => {
 									//forward the request here to the port
 									// return_500(tcp_stream, String::new()).await; // on fail
+
+									
+									let client_builder = reqwest::ClientBuilder::new();
+									let client = client_builder.danger_accept_invalid_certs(true).build().unwrap();
+									let url = format!("https://localhost:{}{}", container_public_port, request.path);
+									
+									let send_request_result = client.request(reqwest::Method::from_str(request.method.as_str()).unwrap(), url).headers(request.headers).body(request.body).send().await;
+									match send_request_result {
+										Ok(response) => {
+											let response_bytes = response.bytes().await.unwrap();
+											let _write_result = tcp_stream.write_all(&response_bytes).await;
+											let _flush_result = tcp_stream.flush().await;
+											
+										},
+										Err(err) => {
+											println!("err: {}",err)
+										},
+									}
+
+
+
 								},
 								Err(_) => { //cannot next as it is empty
 									//create the container here
-									lb.mode = ELoadBalancerMode::QUEUE; // force it on queue mode
-									lb.queue_stream(tcp_stream);
-									lb.create_container().await;
+									
+									match lb.create_container().await {
+										Ok(new_container) => {
+											//created  successfully
+											
+											match new_container.start_container().await {
+												Ok(_) => {
+													lb.mode = ELoadBalancerMode::QUEUE;
+													lb.queue_stream(tcp_stream);
+													lb.add_container(new_container);
+												},
+												Err(docker_start_error) => {
+													return_500(tcp_stream, docker_start_error).await;
+												}
+											}
+											
+										},
+										Err(docker_create_error) => {
+											return_500(tcp_stream, docker_create_error).await;
+										},
+									}
 									
 									
 								},
