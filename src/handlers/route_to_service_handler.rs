@@ -1,9 +1,10 @@
 use std::{error::Error, str::FromStr};
 
 use custom_tcp_listener::models::types::Request;
-use tokio::{io::AsyncWriteExt, net::TcpStream};
+use http::StatusCode;
+use tokio::{io::AsyncWriteExt, net::TcpStream, sync::oneshot::error};
 
-use crate::{controllers::{load_balancer_controller::{get_or_init_load_balancer, ELoadBalancerMode, LOADBALANCERS}, route_controller::route_resolver}, models::service_route_model::ServiceRoute, utils::orchestrator_utils::{return_404, return_500}};
+use crate::{controllers::{load_balancer_controller::{get_or_init_load_balancer, ELoadBalancerMode, LOADBALANCERS}, route_controller::route_resolver}, models::service_route_model::ServiceRoute, utils::orchestrator_utils::{return_404, return_500, return_503}};
 
 
 pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStream) -> Result<(), Box<dyn Error>> {
@@ -30,21 +31,17 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 									let client = client_builder.danger_accept_invalid_certs(true).build().unwrap();
 									let url = format!("https://localhost:{}{}", container_public_port, request.path);
 									
-									let send_request_result = client.request(reqwest::Method::from_str(request.method.as_str()).unwrap(), url).headers(request.headers).body(request.body).send().await;
+									let send_request_result: Result<reqwest::Response, reqwest::Error> = client.request(reqwest::Method::from_str(request.method.as_str()).unwrap(), url).headers(request.headers).body(request.body).send().await;
 									match send_request_result {
 										Ok(response) => {
 											let response_bytes = response.bytes().await.unwrap();
 											let _write_result = tcp_stream.write_all(&response_bytes).await;
 											let _flush_result = tcp_stream.flush().await;
-											
 										},
-										Err(err) => {
-											println!("err: {}",err)
-										},
+										Err(_) => { //errors concerning the connection towards the address
+											return_503(tcp_stream).await;
+										}
 									}
-
-
-
 								},
 								Err(_) => { //cannot next as it is empty
 									//create the container here
