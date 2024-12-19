@@ -143,7 +143,8 @@ pub async fn get_or_init_load_balancer(mongo_image: ObjectId, address: String, e
                 										docker_image_id: service_image_entry.docker_image_id.clone(),
 														exposed_port,
                 										mode: ELoadBalancerMode::QUEUE,
-														tcp_queue: Vec::new() 
+														tcp_queue: Vec::new(),
+                										awaited_containers: HashMap::new(), 
 													});
 													Ok(service_image_entry.docker_image_id)
 												},

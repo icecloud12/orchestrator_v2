@@ -5,7 +5,7 @@ use custom_tcp_listener::models::listener::bind;
 use custom_tcp_listener::models::route::{connect, delete, get, head, option, patch, post, put, trace};
 use custom_tcp_listener::models::router::Router;
 use dotenv::dotenv;
-use handlers::route_to_service_handler::{route_to_service_handler};
+use handlers::route_to_service_handler::{container_ready, route_to_service_handler};
 use utils::{docker_utils, mongodb_utils};
 use std::{env};
 
@@ -57,7 +57,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
 	load_balancer_controller::init();
 
 	//there is no way shape or form this would miss
-	let mut router = Router::new()
+	let router = Router::new()
+		.route("/orchestrator/container/ready/:docker_container_id:".to_string(), post(container_ready))
 		.route("/*".to_string(), connect(route_to_service_handler))
 		.route("/*".to_string(), get(route_to_service_handler))
 		.route("/*".to_string(), delete(route_to_service_handler))

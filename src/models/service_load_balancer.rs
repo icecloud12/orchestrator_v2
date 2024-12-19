@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
@@ -19,6 +21,7 @@ pub struct ServiceLoadBalancer {
     pub behavior: ELoadBalancerBehavior,
     pub mode: ELoadBalancerMode,
     pub containers: Vec<ServiceContainer>, //docker_container_id_instances
+    pub awaited_containers: HashMap<String, ServiceContainer>,//docker_containers not pushed to the active container vector
     pub validated: bool, //initially false to let the program know if the containers are checke,
     pub tcp_queue: Vec<TcpStream>
 }
@@ -71,6 +74,10 @@ impl ServiceLoadBalancer {
 		let containers = &mut self.containers;
 		containers.push(container);
 	}
+    pub fn queue_container(&mut self, container: ServiceContainer) {
+        let awaited_containers = &mut self.awaited_containers;
+        awaited_containers.insert(container.container_id.clone(), container);
+    }
 }
 
 //this struct represents the data from mongodb

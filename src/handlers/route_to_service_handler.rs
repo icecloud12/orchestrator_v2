@@ -1,10 +1,10 @@
-use std::{error::Error, str::FromStr};
+use std::{clone, error::Error, str::FromStr};
 
-use custom_tcp_listener::models::types::Request;
+use custom_tcp_listener::models::{router::response_to_bytes, types::Request};
 use http::StatusCode;
 use tokio::{io::AsyncWriteExt, net::TcpStream, sync::oneshot::error};
 
-use crate::{controllers::{load_balancer_controller::{get_or_init_load_balancer, ELoadBalancerMode, LOADBALANCERS}, route_controller::route_resolver}, models::service_route_model::ServiceRoute, utils::orchestrator_utils::{return_404, return_500, return_503}};
+use crate::{controllers::{load_balancer_controller::{get_or_init_load_balancer, ELoadBalancerMode, AWAITED_CONTAINERS, LOADBALANCERS}, route_controller::route_resolver}, models::{service_load_balancer, service_route_model::ServiceRoute}, utils::orchestrator_utils::{return_404, return_500, return_503}};
 
 
 pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStream) -> Result<(), Box<dyn Error>> {
@@ -50,7 +50,7 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 												Ok(_) => {
 													lb.mode = ELoadBalancerMode::QUEUE;
 													lb.queue_stream(tcp_stream);
-													lb.add_container(new_container);
+													lb.queue_container(new_container);
 												},
 												Err(docker_start_error) => {
 													return_500(tcp_stream, docker_start_error).await;
@@ -81,4 +81,26 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 		},
 	};
 	Ok(())	
+}
+
+pub async fn container_ready(request:Request, mut tcp_stream: TcpStream) -> Result<(), Box<dyn Error>> {
+	let params = request.parameters;
+	let docker_container_id = params.get("docker_container_id").unwrap();
+	let awaited_container_mutex = AWAITED_CONTAINERS.get().unwrap();
+	let awaited_containers = awaited_container_mutex.lock().await;
+	let load_balancer_key = awaited_containers.get(docker_container_id).unwrap().clone();
+	drop(awaited_containers);
+	let load_balacer_mutex = LOADBALANCERS.get().unwrap();
+	let mut load_balancers = load_balacer_mutex.lock().await;
+	let service_load_balancer = load_balancers.get_mut(&load_balancer_key).unwrap();
+	let awaited_container_key_val_pair = service_load_balancer.awaited_containers.remove_entry(docker_container_id).unwrap();
+	service_load_balancer.add_container(awaited_container_key_val_pair.1);
+
+	//respond to the stream with an empty OK body
+	let empty_body: &[u8] = &Vec::new();
+	let response_builder = http::Response::builder().status(StatusCode::OK).body(empty_body).unwrap();
+	let response_bytes = response_to_bytes(response_builder);
+	let _write_result = tcp_stream.write_all(&response_bytes).await; //we dont care if it fails
+	let _flush_result = tcp_stream.flush().await;
+	Ok(())
 }
