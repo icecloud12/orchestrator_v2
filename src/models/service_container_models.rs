@@ -9,11 +9,13 @@ pub struct ServiceContainer {
 	pub _id: ObjectId, 
 	pub container_id: String, // docker internal id of the docker container
 	pub public_port: usize, //
+	pub uuid: String
 }
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ServiceContainerBody{
 	pub container_id: String, // docker internal id of the docker container
 	pub public_port: usize, //
+	pub uuid: String
 }
 
 pub type DockerImageId = String;

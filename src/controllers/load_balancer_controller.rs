@@ -1,12 +1,10 @@
 use std::{collections::HashMap, sync::{Arc, OnceLock}};
 
-use bollard::{container, service};
 use mongodb::{bson::{doc, oid::ObjectId}, error};
 use tokio::sync::Mutex;
 
 use crate::{models::{service_container_models::DockerImageId, service_image_models::ServiceImage, service_load_balancer::{LoadBalancerEntry, LoadBalancerEntryAggregate, LoadBalancerInsert, ServiceLoadBalancer}}, utils::mongodb_utils::MongoCollections};
 
-use super::container_controller::create_container;
 
 
 pub static LOADBALANCERS: OnceLock<Arc<Mutex<HashMap<DockerImageId, ServiceLoadBalancer>>>> = OnceLock::new();

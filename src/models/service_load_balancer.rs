@@ -76,7 +76,7 @@ impl ServiceLoadBalancer {
 	}
     pub fn queue_container(&mut self, container: ServiceContainer) {
         let awaited_containers = &mut self.awaited_containers;
-        awaited_containers.insert(container.container_id.clone(), container);
+        awaited_containers.insert(container.uuid.clone(), container);
     }
 }
 

@@ -85,15 +85,15 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 
 pub async fn container_ready(request:Request, mut tcp_stream: TcpStream) -> Result<(), Box<dyn Error>> {
 	let params = request.parameters;
-	let docker_container_id = params.get("docker_container_id").unwrap();
+	let uuid = params.get("uuid").unwrap();
 	let awaited_container_mutex = AWAITED_CONTAINERS.get().unwrap();
 	let awaited_containers = awaited_container_mutex.lock().await;
-	let load_balancer_key = awaited_containers.get(docker_container_id).unwrap().clone();
+	let load_balancer_key = awaited_containers.get(uuid).unwrap().clone();
 	drop(awaited_containers);
 	let load_balacer_mutex = LOADBALANCERS.get().unwrap();
 	let mut load_balancers = load_balacer_mutex.lock().await;
 	let service_load_balancer = load_balancers.get_mut(&load_balancer_key).unwrap();
-	let awaited_container_key_val_pair = service_load_balancer.awaited_containers.remove_entry(docker_container_id).unwrap();
+	let awaited_container_key_val_pair = service_load_balancer.awaited_containers.remove_entry(uuid).unwrap();
 	service_load_balancer.add_container(awaited_container_key_val_pair.1);
 
 	//respond to the stream with an empty OK body

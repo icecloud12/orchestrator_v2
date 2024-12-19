@@ -19,7 +19,7 @@ pub async fn return_500(mut tcp_stream: TcpStream, message: String) {
 }
 
 pub async fn return_503(mut tcp_stream:TcpStream){
-	let body: &[u8] = &Vec::new();;
+	let body: &[u8] = &Vec::new();
 	let response_builder = http::Response::builder().status(StatusCode::SERVICE_UNAVAILABLE).body(body).unwrap();
 	let response_bytes = response_to_bytes(response_builder);
 	let _write_result = tcp_stream.write_all(&response_bytes).await; //we dont care if it fails

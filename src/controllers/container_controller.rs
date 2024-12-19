@@ -1,8 +1,9 @@
-use std::{collections::HashMap, process::{exit, ExitCode}};
+use std::{collections::HashMap, fmt::format, process::{exit, ExitCode}};
 
 use bollard::{container::{Config, CreateContainerOptions}, secret::{ContainerCreateResponse, HostConfig, PortBinding}};
 use mongodb::bson::{doc, oid::ObjectId};
 use rand::Rng;
+use uuid::Uuid;
 
 use crate::{models::service_container_models::{ServiceContainer, ServiceContainerBody}, utils::{docker_utils::DOCKER, mongodb_utils::{MongoCollections, DATABASE}}};
 
@@ -29,9 +30,11 @@ pub async fn create_container(docker_image_id: &String, exposed_port: &String) -
 		port_bindings : Some(port_binding),
 		..Default::default()
 	};
+	let uuid = Uuid::new_v4().simple().to_string();
 	let config = Config {
 		image: Some(docker_image_id.to_owned()),
 		host_config: Some(host_config),
+		env: Some(vec![format!("uuid={}",uuid.clone())]),
 		..Default::default()
 	};
 	let create_container_result = docker.create_container(options, config).await;
@@ -39,15 +42,18 @@ pub async fn create_container(docker_image_id: &String, exposed_port: &String) -
 		Ok(res) => {
 			//insert into db the container
 			
+			
 			let insert_result = MongoCollections::Containers.as_collection::<ServiceContainerBody>().insert_one(ServiceContainerBody {
 				container_id: res.id.clone(),
 				public_port: local_port.clone(),
+				uuid: uuid.clone()
 			}).await;
 			match insert_result {
 				Ok(insert_result) => Ok(ServiceContainer{
 					_id: insert_result.inserted_id.as_object_id().unwrap(),
 					container_id: res.id,
 					public_port: local_port,
+					uuid: uuid.clone()
 				}),
 				Err(err) => Err(err.to_string()),
 			}

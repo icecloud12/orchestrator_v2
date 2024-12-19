@@ -20,3 +20,4 @@ serde_json = "1.0.117"
 tokio = { version = "1.40.0", features = ["full"] }
 custom-tcp-listener = { git = "https://github.com/icecloud12/custom-tcp-listener.git" }
 rand = "0.8.5"
+uuid = { version = "1.11.0", features = ["v4"] }

@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
 
 	//there is no way shape or form this would miss
 	let router = Router::new()
-		.route("/orchestrator/container/ready/:docker_container_id:".to_string(), post(container_ready))
+		.route("/orchestrator/container/ready/:uuid:".to_string(), post(container_ready))
 		.route("/*".to_string(), connect(route_to_service_handler))
 		.route("/*".to_string(), get(route_to_service_handler))
 		.route("/*".to_string(), delete(route_to_service_handler))
