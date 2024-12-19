@@ -16,17 +16,14 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 				Some(t2) => {
 					let ServiceRoute {mongo_image, address, exposed_port, ..} = t2;
 					let lb_key = get_or_init_load_balancer(mongo_image,address,exposed_port).await.unwrap();
-					let mut lb_hm = LOADBALANCERS.get().unwrap().lock().await;
+					let lb_mutex = LOADBALANCERS.get().unwrap();
+					let mut lb_hm = lb_mutex.lock().await;
 					let lb= lb_hm.get_mut(&lb_key).unwrap();
 					match lb.mode {
 						ELoadBalancerMode::FORWARD => {
 							let next_container_result = lb.next_container().await;
 							match next_container_result {
 								Ok(container_public_port) => {
-									//forward the request here to the port
-									// return_500(tcp_stream, String::new()).await; // on fail
-
-									
 									let client_builder = reqwest::ClientBuilder::new();
 									let client = client_builder.danger_accept_invalid_certs(true).build().unwrap();
 									let url = format!("https://localhost:{}{}", container_public_port, request.path);
@@ -48,8 +45,7 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 									
 									match lb.create_container().await {
 										Ok(new_container) => {
-											//created  successfully
-											
+											//created  successfully	
 											match new_container.start_container().await {
 												Ok(_) => {
 													lb.mode = ELoadBalancerMode::QUEUE;
@@ -60,7 +56,6 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 													return_500(tcp_stream, docker_start_error).await;
 												}
 											}
-											
 										},
 										Err(docker_create_error) => {
 											return_500(tcp_stream, docker_create_error).await;
