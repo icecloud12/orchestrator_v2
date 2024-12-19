@@ -298,7 +298,7 @@ dependencies = [
 [[package]]
 name = "custom-tcp-listener"
 version = "0.1.0"
-source = "git+https://github.com/icecloud12/custom-tcp-listener.git#78ac1e49cf694295529911de70ee00d120c16f70"
+source = "git+https://lgubislig.app/gitea/johnsonjaurigue/custom_tcp_listener.git#78ac1e49cf694295529911de70ee00d120c16f70"
 dependencies = [
  "dotenv",
  "http",
