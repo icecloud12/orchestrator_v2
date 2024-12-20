@@ -8,7 +8,7 @@ use crate::{controllers::{load_balancer_controller::{get_or_init_load_balancer, 
 
 
 pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStream) -> Result<(), Box<dyn Error>> {
-	
+	println!("{:#?}", &request);
 	let resolved_service = route_resolver(request.path.clone()).await;
 	match resolved_service {
 		Ok(t1) => {
