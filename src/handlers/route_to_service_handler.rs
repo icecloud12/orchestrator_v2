@@ -8,7 +8,6 @@ use crate::{controllers::{load_balancer_controller::{get_or_init_load_balancer, 
 
 
 pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStream) -> Result<(), Box<dyn Error>> {
-	println!("{:#?}", &request);
 	let resolved_service = route_resolver(request.path.clone()).await;
 	match resolved_service {
 		Ok(t1) => {
@@ -19,11 +18,13 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 					let lb_mutex = LOADBALANCERS.get().unwrap();
 					let mut lb_hm = lb_mutex.lock().await;
 					let lb= lb_hm.get_mut(&lb_key).unwrap();
+					println!("{:#?}", &lb);
 					match lb.mode {
 						ELoadBalancerMode::FORWARD => {
 							let next_container_result = lb.next_container().await;
 							match next_container_result {
 								Ok(container_public_port) => {
+									println!("next-container-succes");
 									let client_builder = reqwest::ClientBuilder::new();
 									let client = client_builder.danger_accept_invalid_certs(true).build().unwrap();
 									let url = format!("https://localhost:{}{}", container_public_port, request.path);
@@ -42,9 +43,10 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 								},
 								Err(_) => { //cannot next as it is empty
 									//create the container here
-									
+									println!("next-container-fail");
 									match lb.create_container().await {
 										Ok(new_container) => {
+											println!("create-container-success");
 											//created  successfully	
 											match new_container.start_container().await {
 												Ok(_) => {
@@ -58,6 +60,7 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 											}
 										},
 										Err(docker_create_error) => {
+											println!("create-container-fail");
 											return_500(tcp_stream, docker_create_error).await;
 										},
 									}
