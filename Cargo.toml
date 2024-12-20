@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [http]
-check-config = false
+check-revoke = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -21,6 +21,6 @@ reqwest = "0.12.8"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.117"
 tokio = { version = "1.40.0", features = ["full"] }
-custom-tcp-listener = { git = "https://github.com/icecloud12/custom-tcp-listener.git" }
+custom-tcp-listener = { git = "https://lgubislig.app/gitea/johnsonjaurigue/orchestrator_v2.git" }
 rand = "0.8.5"
 uuid = { version = "1.11.0", features = ["v4"] }
