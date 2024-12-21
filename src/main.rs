@@ -68,7 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
 		.route("/*".to_string(), post(route_to_service_handler))
 		.route("/*".to_string(), put(route_to_service_handler))
 		.route("/*".to_string(), trace(route_to_service_handler));
-	bind(router, format!("{listening_address}:{listening_port}").as_str()).await?;
+ 	bind(router, format!("{listening_address}:{listening_port}").as_str()).await?;
     return Ok(())
 }
 

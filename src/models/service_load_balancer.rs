@@ -23,7 +23,7 @@ pub struct ServiceLoadBalancer {
     pub containers: Vec<ServiceContainer>, //docker_container_id_instances
     pub awaited_containers: HashMap<String, ServiceContainer>,//docker_containers not pushed to the active container vector
     pub validated: bool, //initially false to let the program know if the containers are checke,
-    pub tcp_queue: Vec<TcpStream>
+    pub tcp_queue: Vec<TcpStream> 
 }
 
 impl ServiceLoadBalancer {

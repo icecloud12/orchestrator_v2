@@ -14,7 +14,7 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 			match t1 {
 				Some(t2) => {
 					let ServiceRoute {mongo_image, address, exposed_port, ..} = t2;
-					let lb_key = get_or_init_load_balancer(mongo_image,address,exposed_port).await.unwrap();
+					let (lb_key, new_lb) = get_or_init_load_balancer(mongo_image,address,exposed_port).await.unwrap();
 					let lb_mutex = LOADBALANCERS.get().unwrap();
 					let mut lb_hm = lb_mutex.lock().await;
 					let lb= lb_hm.get_mut(&lb_key).unwrap();
@@ -70,7 +70,27 @@ pub async fn route_to_service_handler (request:Request, mut tcp_stream: TcpStrea
 							};
 						},
 						ELoadBalancerMode::QUEUE => {
-							lb.queue_stream(tcp_stream);
+							// lb.queue_stream(tcp_stream);
+							if new_lb {
+								match lb.create_container().await {
+									Ok(new_container)=> {
+										match new_container.start_container().await {
+											Ok(_container_start_success) => {
+												lb.queue_stream(tcp_stream);
+												lb.queue_container(new_container);
+											},
+											Err(container_start_error) => {
+												return_500(tcp_stream, container_start_error).await;
+											}
+										}
+									},
+									Err(container_create_error)=> {
+										return_500(tcp_stream, container_create_error).await;
+									}
+								}
+							}else{
+								lb.queue_stream(tcp_stream);
+							}
 						},
 					}
 				},

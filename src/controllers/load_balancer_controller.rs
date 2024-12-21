@@ -40,11 +40,11 @@ pub fn init(){
 	LOADBALANCERS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())));
 	AWAITED_CONTAINERS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())));
 }
-///This function returns the load_balancer key and does 3 things:
+///This function returns the load_balancer key and if it is a fresh load balancer does 3 things:
 /// 1. if locally cached then returns the key directly
 /// 2. if not, rebuild it from the database record if it exists there
 /// 3. last case. create a new one. Save it locally and in db
-pub async fn get_or_init_load_balancer(mongo_image: ObjectId, address: String, exposed_port: String) -> Result<DockerImageId, String>{
+pub async fn get_or_init_load_balancer(mongo_image: ObjectId, address: String, exposed_port: String) -> Result<(DockerImageId, bool), String>{
 	//get the image first
 	let find_one_result = MongoCollections::Images.as_collection::<ServiceImage>().find_one(doc!{
 		"_id" : mongo_image
@@ -55,7 +55,7 @@ pub async fn get_or_init_load_balancer(mongo_image: ObjectId, address: String, e
 				Some(service_image_entry) => {
 					let hm = LOADBALANCERS.get().unwrap().lock().await;
 					match hm.get(&service_image_entry.docker_image_id){
-						Some(_service_load_balancer) => Ok(service_image_entry.docker_image_id),
+						Some(_service_load_balancer) => Ok((service_image_entry.docker_image_id, false)),
 						None => {
 							drop(hm);
 							let pipeline = vec![
@@ -144,7 +144,7 @@ pub async fn get_or_init_load_balancer(mongo_image: ObjectId, address: String, e
 														tcp_queue: Vec::new(),
                 										awaited_containers: HashMap::new(), 
 													});
-													Ok(service_image_entry.docker_image_id)
+													Ok((service_image_entry.docker_image_id, true))
 												},
 												Err(err) => Err(err),
 											}
