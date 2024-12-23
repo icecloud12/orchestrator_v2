@@ -169,7 +169,7 @@ pub async fn container_ready(
     let container_port = readied_container.public_port.clone();
     service_load_balancer.add_container(readied_container);
     //acknowledge container readyness
-    let empty_body: &[u8] = &Vec::new();
+    let empty_body: Vec<u8> = Vec::new();
     let response_builder = http::Response::builder()
         .status(StatusCode::OK)
         .body(empty_body)
