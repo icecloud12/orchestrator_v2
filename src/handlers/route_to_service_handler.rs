@@ -2,6 +2,7 @@ use std::{clone, error::Error, str::FromStr};
 
 use custom_tcp_listener::models::{router::response_to_bytes, types::Request};
 use http::StatusCode;
+use reqwest::Response;
 use tokio::{io::AsyncWriteExt, net::TcpStream, sync::oneshot::error};
 
 use crate::{
@@ -15,7 +16,7 @@ use crate::{
         service_load_balancer, service_load_balancer_container_junction_model,
         service_route_model::ServiceRoute,
     },
-    utils::orchestrator_utils::{return_404, return_500, return_503},
+    utils::orchestrator_utils::{return_404, return_500, return_503, return_response},
 };
 
 pub async fn route_to_service_handler(
@@ -53,7 +54,7 @@ pub async fn route_to_service_handler(
                                         .build()
                                         .unwrap();
                                     let url = format!(
-                                        "https://localhost:{}{}",
+                                        "http://localhost:{}{}",
                                         container_public_port, request.path
                                     );
 
@@ -72,10 +73,7 @@ pub async fn route_to_service_handler(
                                         .await;
                                     match send_request_result {
                                         Ok(response) => {
-                                            let response_bytes = response.bytes().await.unwrap();
-                                            let _write_result =
-                                                tcp_stream.write_all(&response_bytes).await;
-                                            let _flush_result = tcp_stream.flush().await;
+                                            return_response(response, tcp_stream).await;
                                         }
                                         Err(_) => {
                                             //errors concerning the connection towards the address
@@ -94,7 +92,7 @@ pub async fn route_to_service_handler(
                                             match new_container.start_container().await {
                                                 Ok(_) => {
                                                     lb.mode = ELoadBalancerMode::QUEUE;
-                                                    lb.queue_stream(tcp_stream);
+                                                    lb.queue_request(request, tcp_stream);
                                                     lb.queue_container(new_container).await;
                                                 }
                                                 Err(docker_start_error) => {
@@ -118,7 +116,7 @@ pub async fn route_to_service_handler(
                                         match new_container.start_container().await {
                                             Ok(_container_start_success) => {
                                                 println!("queueing container");
-                                                lb.queue_stream(tcp_stream);
+                                                lb.queue_request(request, tcp_stream);
                                                 lb.queue_container(new_container).await;
                                             }
                                             Err(container_start_error) => {
@@ -131,7 +129,7 @@ pub async fn route_to_service_handler(
                                     }
                                 }
                             } else {
-                                lb.queue_stream(tcp_stream);
+                                lb.queue_request(request, tcp_stream);
                             }
                         }
                     }
@@ -156,7 +154,8 @@ pub async fn container_ready(
     let uuid = params.get("uuid").unwrap();
     let awaited_container_mutex = AWAITED_CONTAINERS.get().unwrap();
     let awaited_containers = awaited_container_mutex.lock().await;
-    println!("{:#?}", &awaited_containers);
+    println!("awaited containers{:#?}", &awaited_containers);
+    println!("uuid: {}", &uuid);
     let load_balancer_key = awaited_containers.get(uuid).unwrap().clone();
     drop(awaited_containers);
     let load_balacer_mutex = LOADBALANCERS.get().unwrap();
@@ -169,7 +168,6 @@ pub async fn container_ready(
     let readied_container = awaited_container_key_val_pair.1;
     let container_port = readied_container.public_port.clone();
     service_load_balancer.add_container(readied_container);
-
     //acknowledge container readyness
     let empty_body: &[u8] = &Vec::new();
     let response_builder = http::Response::builder()
@@ -182,20 +180,49 @@ pub async fn container_ready(
     //if the load balancer is queue then change it to forwarding
     match service_load_balancer.mode {
         ELoadBalancerMode::QUEUE => {
+            print!("here");
             service_load_balancer.mode = ELoadBalancerMode::FORWARD;
-            service_load_balancer
-                .tcp_queue
-                .iter()
-                .for_each(|queued_tcp_stream| {
-                    //foward all queued stream to the newly made container
-                    //todo NEED TO STORE THE REQUEST INFO AS WELL
-                    queued_tcp_stream;
-                });
+            let queue = service_load_balancer.empty_queue();
+            println!("request_queue : {:#?}", &queue);
+            for (request, mut tcp_stream) in queue.into_iter() {
+                let port = container_port.clone();
+
+                println!("here");
+                //foward all queued stream to the newly made container
+                //todo NEED TO STORE THE REQUEST INFO AS WELL
+                let client_builder = reqwest::ClientBuilder::new();
+                let client = client_builder
+                    .danger_accept_invalid_certs(true)
+                    .build()
+                    .unwrap();
+                let url = format!("http://localhost:{}{}", port, request.path);
+                println!("url:{}", &url);
+                let send_request_result = client
+                    .request(
+                        reqwest::Method::from_str(request.method.as_str()).unwrap(),
+                        url,
+                    )
+                    .headers(request.headers)
+                    .body(request.body)
+                    .send()
+                    .await;
+                match send_request_result {
+                    Ok(response) => {
+                        return_response(response, tcp_stream).await;
+                    }
+                    Err(_) => {
+                        return_503(tcp_stream).await;
+                    }
+                };
+            }
+            service_load_balancer.request_queue = Vec::new();
         }
         ELoadBalancerMode::FORWARD => {
             //do nothing
+
+            print!("here");
         }
     };
-    service_load_balancer.tcp_queue = vec![];
+    service_load_balancer.request_queue = Vec::new();
     Ok(())
 }

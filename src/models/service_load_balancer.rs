@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use custom_tcp_listener::models::types::Request;
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
@@ -24,7 +25,7 @@ pub struct ServiceLoadBalancer {
     pub containers: Vec<ServiceContainer>, //docker_container_id_instances
     pub awaited_containers: HashMap<String, ServiceContainer>, //docker_containers not pushed to the active container vector
     pub validated: bool, //initially false to let the program know if the containers are checke,
-    pub tcp_queue: Vec<TcpStream>,
+    pub request_queue: Vec<(Request, TcpStream)>,
 }
 
 impl ServiceLoadBalancer {
@@ -60,12 +61,6 @@ impl ServiceLoadBalancer {
 
         match col {
             Ok(service_container) => {
-                let mut lock = AWAITED_CONTAINERS.get().unwrap().lock().await;
-                lock.insert(
-                    service_container.container_id.clone(),
-                    self.docker_image_id.clone(),
-                );
-                drop(lock);
                 let _ = load_balancer_container_junction::create(&self._id, &service_container._id)
                     .await;
                 Ok(service_container)
@@ -73,8 +68,8 @@ impl ServiceLoadBalancer {
             Err(err) => Err(err),
         }
     }
-    pub fn queue_stream(&mut self, tcp_stream: TcpStream) {
-        self.tcp_queue.push(tcp_stream);
+    pub fn queue_request(&mut self, request: Request, tcp_stream: TcpStream) {
+        self.request_queue.push((request, tcp_stream));
     }
     pub fn add_container(&mut self, container: ServiceContainer) {
         let containers = &mut self.containers;
@@ -85,6 +80,9 @@ impl ServiceLoadBalancer {
         await_container_lock.insert(container.uuid.clone(), self.docker_image_id.clone());
         let awaited_containers = &mut self.awaited_containers;
         awaited_containers.insert(container.uuid.clone(), container);
+    }
+    pub fn empty_queue(&mut self) -> Vec<(Request, TcpStream)> {
+        std::mem::take(&mut self.request_queue)
     }
 }
 //this struct represents the data from mongodb
