@@ -167,28 +167,35 @@ pub async fn get_or_init_load_balancer(
                                             };
                                             match lb_ref_result {
                                                 Ok(lb_ref) => {
+                                                    let mut lb = ServiceLoadBalancer {
+                                                        _id: lb_ref._id,
+                                                        address: address,
+                                                        head: lb_ref.head,
+                                                        behavior: ELoadBalancerBehavior::RoundRobin,
+                                                        containers: lb_ref.containers,
+                                                        validated: false,
+                                                        docker_image_id: service_image_entry
+                                                            .docker_image_id
+                                                            .clone(),
+                                                        exposed_port,
+                                                        mode: ELoadBalancerMode::QUEUE,
+                                                        request_queue: Vec::new(),
+                                                        awaited_containers: HashMap::new(),
+                                                    };
+                                                    let new_lb: bool = lb.containers.len() == 0;
+                                                    //check container instances here if they are valid
+                                                    println!("validating containers");
+                                                    lb.validate_containers().await;
                                                     let mut hm =
                                                         LOADBALANCERS.get().unwrap().lock().await;
                                                     hm.insert(
                                                         service_image_entry.docker_image_id.clone(),
-                                                        ServiceLoadBalancer {
-                                                            _id: lb_ref._id,
-                                                            address: address,
-                                                            head: lb_ref.head,
-                                                            behavior:
-                                                                ELoadBalancerBehavior::RoundRobin,
-                                                            containers: lb_ref.containers,
-                                                            validated: false,
-                                                            docker_image_id: service_image_entry
-                                                                .docker_image_id
-                                                                .clone(),
-                                                            exposed_port,
-                                                            mode: ELoadBalancerMode::QUEUE,
-                                                            request_queue: Vec::new(),
-                                                            awaited_containers: HashMap::new(),
-                                                        },
+                                                        lb,
                                                     );
-                                                    Ok((service_image_entry.docker_image_id, true))
+                                                    Ok((
+                                                        service_image_entry.docker_image_id,
+                                                        new_lb,
+                                                    ))
                                                 }
                                                 Err(err) => Err(err),
                                             }

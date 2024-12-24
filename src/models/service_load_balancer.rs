@@ -1,13 +1,20 @@
 use std::collections::HashMap;
 
+use bollard::{
+    container::ListContainersOptions,
+    service::{ContainerState, ContainerStateStatusEnum, ContainerStatus},
+};
 use custom_tcp_listener::models::types::Request;
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 
-use crate::controllers::{
-    container_controller, load_balancer_container_junction,
-    load_balancer_controller::{ELoadBalancerBehavior, ELoadBalancerMode, AWAITED_CONTAINERS},
+use crate::{
+    controllers::{
+        container_controller, load_balancer_container_junction,
+        load_balancer_controller::{ELoadBalancerBehavior, ELoadBalancerMode, AWAITED_CONTAINERS},
+    },
+    utils::docker_utils::DOCKER,
 };
 
 use super::service_container_models::ServiceContainer;
@@ -83,6 +90,64 @@ impl ServiceLoadBalancer {
     }
     pub fn empty_queue(&mut self) -> Vec<(Request, TcpStream)> {
         std::mem::take(&mut self.request_queue)
+    }
+    pub async fn validate_containers(&mut self) {
+        let containers: Vec<ServiceContainer> = std::mem::take(&mut self.containers);
+        let mut container_map: HashMap<String, ServiceContainer> = HashMap::new();
+        containers.into_iter().for_each(|container| {
+            container_map.insert(container.container_id.clone(), container);
+        });
+        let mut filters = HashMap::new();
+
+        filters.insert("id", container_map.keys().map(|k| k.as_str()).collect());
+        println!("{:#?}", filters);
+        let options = ListContainersOptions {
+            all: true,
+            filters,
+            ..Default::default()
+        };
+        let docker = DOCKER.get().unwrap();
+        let _container_list_result = match docker.list_containers(Some(options)).await {
+            Ok(container_list) => {
+                println!("{:#?}", container_list);
+                for container_summary in container_list.into_iter() {
+                    let container_status = container_summary.state.unwrap();
+                    if container_status == ContainerStateStatusEnum::RUNNING.as_ref() {
+                        let container: ServiceContainer = container_map
+                            .remove(container_summary.id.unwrap().as_str())
+                            .unwrap();
+
+                        self.containers.push(container);
+                    } else {
+                        let container = container_map
+                            .remove(container_summary.id.unwrap().as_str())
+                            .unwrap();
+                        //if we cannot start the container we must remove the container from db and docker
+                        //await the containers before trying to start
+
+                        let mut await_container_lock =
+                            AWAITED_CONTAINERS.get().unwrap().lock().await;
+                        match container.start_container().await {
+                            Ok(_) => {
+                                let uuid = container.uuid.clone();
+                                await_container_lock
+                                    .insert(uuid.clone(), self.docker_image_id.clone());
+                                let awaited_containers = &mut self.awaited_containers;
+                                awaited_containers.insert(uuid, container);
+                            }
+                            Err(_docker_container_start_error) => {
+                                println!("{}", _docker_container_start_error);
+                                //remove mongodb row for container and junction
+                                //remove existing docker container
+                            }
+                        };
+                    };
+                }
+                Ok(())
+            }
+            Err(docker_container_list_error) => Err(docker_container_list_error.to_string()),
+        };
+        println!("exiting validation");
     }
 }
 //this struct represents the data from mongodb
