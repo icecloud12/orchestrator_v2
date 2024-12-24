@@ -93,7 +93,7 @@ pub async fn get_or_init_load_balancer(
                                 doc! {
                                     "$lookup" : {
                                         "from": "containers",
-                                        "localField": "junc.container_id",
+                                        "localField": "_junc.container_id",
                                         "foreignField": "_id",
                                         "as" : "containers"
                                     }
@@ -113,7 +113,7 @@ pub async fn get_or_init_load_balancer(
                                 },
                             ];
 
-                            let mut result_cursor = MongoCollections::LoadBalancers
+                            let result_cursor = MongoCollections::LoadBalancers
                                 .as_collection::<LoadBalancerEntryAggregate>()
                                 .aggregate(pipeline)
                                 .with_type::<LoadBalancerEntryAggregate>()
@@ -124,7 +124,14 @@ pub async fn get_or_init_load_balancer(
                                     match cursor.advance().await {
                                         Ok(advanced) => {
                                             let lb_ref_result = if advanced {
-                                                Ok(cursor.deserialize_current().unwrap())
+                                                let cursor_deserialized =
+                                                    cursor.deserialize_current();
+                                                println!("{:#?}", &cursor_deserialized);
+                                                match cursor_deserialized {
+                                                    Ok(t) => Ok(t),
+                                                    Err(err) => Err(err.to_string()),
+                                                }
+                                                // Ok(cursor.deserialize_current().unwrap())
                                             } else {
                                                 // empty result
                                                 let lb_create_result =
@@ -141,25 +148,19 @@ pub async fn get_or_init_load_balancer(
                                                         .await;
                                                 match lb_create_result {
                                                     Ok(insert_result) => {
-                                                        let new_entry_cursor_result = MongoCollections::LoadBalancers.as_collection::<LoadBalancerEntry>().find_one(doc!{
-															"_id": insert_result.inserted_id.as_object_id().unwrap()
-														}).await;
-                                                        match new_entry_cursor_result {
-                                                            Ok(new_entry_cursor) => {
-                                                                let l_b_entry =
-                                                                    new_entry_cursor.unwrap();
-                                                                Ok(LoadBalancerEntryAggregate {
-                                                                    _id: l_b_entry._id,
-                                                                    mongo_image_reference:
-                                                                        l_b_entry
-                                                                            .mongo_image_reference,
-                                                                    head: 0,
-                                                                    behavior: l_b_entry.behavior, // need to be based from string to Enum
-                                                                    containers: vec![],
-                                                                })
-                                                            }
-                                                            Err(err) => Err(err.to_string()),
-                                                        }
+                                                        Ok(LoadBalancerEntryAggregate {
+                                                            _id: insert_result
+                                                                .inserted_id
+                                                                .as_object_id()
+                                                                .unwrap(),
+                                                            mongo_image_reference:
+                                                                service_image_entry._id,
+                                                            head: 0,
+                                                            behavior:
+                                                                ELoadBalancerBehavior::RoundRobin
+                                                                    .to_string(),
+                                                            containers: vec![],
+                                                        })
                                                     }
                                                     Err(err) => Err(err.to_string()),
                                                 }
