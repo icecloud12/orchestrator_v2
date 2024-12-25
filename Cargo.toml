@@ -12,7 +12,6 @@ http = "1.1.0"
 httparse = "1.9.2"
 hyper = "1.4.1"
 log = "0.4.21"
-mongodb = "3.1.0"
 regex = "1.11.1"
 reqwest = "0.12.8"
 serde = { version = "1.0.210", features = ["derive"] }
