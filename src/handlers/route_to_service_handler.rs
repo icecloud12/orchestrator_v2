@@ -29,13 +29,13 @@ pub async fn route_to_service_handler(
             match t1 {
                 Some(t2) => {
                     let ServiceRoute {
-                        mongo_image,
-                        address,
+                        image_fk,
+                        prefix,
                         exposed_port,
                         ..
                     } = t2;
                     let (lb_key, new_lb) =
-                        get_or_init_load_balancer(mongo_image, address, exposed_port)
+                        get_or_init_load_balancer(image_fk, prefix, exposed_port)
                             .await
                             .unwrap();
                     let lb_mutex = LOADBALANCERS.get().unwrap();

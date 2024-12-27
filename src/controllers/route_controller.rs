@@ -15,18 +15,16 @@ pub async fn route_resolver(uri_string: String) -> Result<Option<ServiceRoute>, 
             let service_route = if !rows.is_empty() {
                 let row = &rows[0];
                 Some(ServiceRoute {
-                    id: row.get::<&str, i32>(ServiceRouteColumns::ID.to_string().as_str()) as usize,
+                    id: row.get::<&str, i32>(ServiceRouteColumns::ID.to_string().as_str()),
                     image_fk: row
-                        .get::<&str, i32>(ServiceRouteColumns::IMAGE_FK.to_string().as_str())
-                        as usize,
+                        .get::<&str, i32>(ServiceRouteColumns::IMAGE_FK.to_string().as_str()),
                     prefix: row
                         .get::<&str, String>(ServiceRouteColumns::PREFIX.to_string().as_str()),
                     exposed_port: row.get::<&str, String>(
                         ServiceRouteColumns::EXPOSED_PORT.to_string().as_str(),
                     ),
                     segments: row
-                        .get::<&str, i32>(ServiceRouteColumns::SEGMENTS.to_string().as_str())
-                        as usize,
+                        .get::<&str, i32>(ServiceRouteColumns::SEGMENTS.to_string().as_str()),
                 })
             } else {
                 None

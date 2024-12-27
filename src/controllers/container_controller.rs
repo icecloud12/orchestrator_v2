@@ -50,7 +50,7 @@ pub async fn create_container(docker_image_id: &String, exposed_port: &String) -
 			}).await;
 			match insert_result {
 				Ok(insert_result) => Ok(ServiceContainer{
-					_id: insert_result.inserted_id.as_object_id().unwrap(),
+					id: insert_result.inserted_id.as_object_id().unwrap(),
 					container_id: res.id,
 					public_port: local_port,
 					uuid: uuid.clone()

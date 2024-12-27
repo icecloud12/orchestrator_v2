@@ -1,20 +1,17 @@
 use std::collections::HashMap;
 
-use bollard::{
-    container::ListContainersOptions,
-    service::{ContainerState, ContainerStateStatusEnum, ContainerStatus},
-};
+use bollard::{container::ListContainersOptions, service::ContainerStateStatusEnum};
 use custom_tcp_listener::models::types::Request;
-use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
+use tokio_postgres::types::Type;
 
 use crate::{
     controllers::{
         container_controller, load_balancer_container_junction,
         load_balancer_controller::{ELoadBalancerBehavior, ELoadBalancerMode, AWAITED_CONTAINERS},
     },
-    utils::docker_utils::DOCKER,
+    utils::{docker_utils::DOCKER, postgres_utils::POSTGRES_CLIENT},
 };
 
 use super::service_container_models::ServiceContainer;
@@ -22,11 +19,11 @@ use super::service_container_models::ServiceContainer;
 #[derive(Debug)]
 //this struct represents the load balancer of the current program
 pub struct ServiceLoadBalancer {
-    pub _id: ObjectId, //mongo_db_load_balancer_instance,
+    pub id: i32, //mongo_db_load_balancer_instance,
     pub docker_image_id: String,
     pub exposed_port: String,
     pub address: String,
-    pub head: usize, //current head pointer of the load_balancer
+    pub head: i32, //current head pointer of the load_balancer
     pub behavior: ELoadBalancerBehavior,
     pub mode: ELoadBalancerMode,
     pub containers: Vec<ServiceContainer>, //docker_container_id_instances
@@ -36,6 +33,38 @@ pub struct ServiceLoadBalancer {
 }
 
 impl ServiceLoadBalancer {
+
+    pub async fn new(image_fk: i32, docker_image_id: String, exposed_port: String, address:String) -> Result<ServiceLoadBalancer, String>{
+
+        let head: i32 = 0;
+        let behavior: String = ELoadBalancerBehavior::RoundRobin.to_string();
+        let insert_result = POSTGRES_CLIENT.get().unwrap().query_typed("INSERT INTO load_balancers (image_fk, head, behavior) VALUES ($1, $2, $3) RETURNING id", &[(&image_fk, Type::INT4), 
+            (&head, Type::INT4), 
+            (&behavior, Type::TEXT)]).await;
+        match insert_result {
+            Ok(rows) => {
+                //returns exactly 1 row
+                let id: i32 = rows[0].get::<&str,i32>("id");
+                
+                
+                let load_balancer = ServiceLoadBalancer{
+                    id,
+                    docker_image_id,
+                    exposed_port,
+                    address,
+                    head: 0,
+                    behavior: ELoadBalancerBehavior::RoundRobin,
+                    mode: ELoadBalancerMode::QUEUE,
+                    containers: vec![], 
+                    awaited_containers: HashMap::new(),
+                    validated: false,
+                    request_queue: vec![]
+                };
+                Ok(load_balancer)
+            }
+            Err(err) => {Err(err.to_string())}
+        }
+    }
     ///the container array size differ depending on:
     /// 1. if it's newly created
     /// 2. the recorded load_balancer in the database have/have no entries
