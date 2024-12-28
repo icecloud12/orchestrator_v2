@@ -1,9 +1,8 @@
-use std::{clone, error::Error, str::FromStr};
+use std::{error::Error, str::FromStr};
 
 use custom_tcp_listener::models::{router::response_to_bytes, types::Request};
 use http::StatusCode;
-use reqwest::Response;
-use tokio::{io::AsyncWriteExt, net::TcpStream, sync::oneshot::error};
+use tokio::{io::AsyncWriteExt, net::TcpStream};
 
 use crate::{
     controllers::{
@@ -12,10 +11,7 @@ use crate::{
         },
         route_controller::route_resolver,
     },
-    models::{
-        service_load_balancer, service_load_balancer_container_junction_model,
-        service_route_model::ServiceRoute,
-    },
+    models::{service_image_models::ServiceImage, service_route_model::ServiceRoute},
     utils::orchestrator_utils::{return_404, return_500, return_503, return_response},
 };
 
@@ -23,19 +19,30 @@ pub async fn route_to_service_handler(
     request: Request,
     mut tcp_stream: TcpStream,
 ) -> Result<(), Box<dyn Error>> {
-    let resolved_service = route_resolver(request.path.clone()).await;
+    let resolved_service: Result<(Option<ServiceRoute>, Option<ServiceImage>), String> =
+        route_resolver(request.path.clone()).await;
     match resolved_service {
-        Ok(t1) => {
-            match t1 {
-                Some(t2) => {
+        Ok((service_route_option, service_image_option)) => {
+            match (service_route_option, service_image_option) {
+                (None, _) => {
+                    return_404(tcp_stream).await;
+                }
+                (Some(_), None) => {
+                    return_500(
+                        tcp_stream,
+                        "Orchestrator Error: System cannot find route-image pair".to_string(),
+                    )
+                    .await
+                }
+                (Some(service_route), Some(service_image)) => {
                     let ServiceRoute {
                         image_fk,
                         prefix,
                         exposed_port,
                         ..
-                    } = t2;
+                    } = service_route;
                     let (lb_key, new_lb) =
-                        get_or_init_load_balancer(image_fk, prefix, exposed_port)
+                        get_or_init_load_balancer(image_fk, prefix, exposed_port, service_image)
                             .await
                             .unwrap();
                     let lb_mutex = LOADBALANCERS.get().unwrap();
@@ -134,15 +141,13 @@ pub async fn route_to_service_handler(
                         }
                     }
                 }
-                None => {
-                    return_404(tcp_stream).await;
-                }
             }
         }
         Err(err) => {
             return_500(tcp_stream, err).await;
         }
-    };
+    }
+
     Ok(())
 }
 

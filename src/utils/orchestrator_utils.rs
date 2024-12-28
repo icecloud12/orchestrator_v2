@@ -18,7 +18,7 @@ pub async fn return_404(mut tcp_stream: TcpStream) {
 pub async fn return_500(mut tcp_stream: TcpStream, message: String) {
     let body: Vec<u8> = message.as_bytes().to_vec();
     let response_builder = http::Response::builder()
-        .status(StatusCode::NOT_FOUND)
+        .status(StatusCode::INTERNAL_SERVER_ERROR)
         .body(body)
         .unwrap();
     let response_bytes = response_to_bytes(response_builder);
