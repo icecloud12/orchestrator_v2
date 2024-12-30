@@ -137,9 +137,9 @@ pub async fn get_or_init_load_balancer(
             //this situation is bound to happen and does not need the stars to align(by pure luck)
 
             //awaited load balancer mutex should help us group them if ever the creation of lb might be delayed
-            let awaited_lb = AWAITED_LOADBALANCERS.get().unwrap().blocking_lock();
+            let mut awaited_lb = AWAITED_LOADBALANCERS.get().unwrap().blocking_lock();
             //blocking lock it to be prioritized
-            awaited_lb.insert(service_image.docker_image_id.clone(), Some(vec![]));
+            awaited_lb.insert(service_image.docker_image_id.clone(), vec![]);
             drop(awaited_lb);
 
             let load_balancer_query_result: Result<ServiceLoadBalancer, String> =
