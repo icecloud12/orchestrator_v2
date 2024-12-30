@@ -1,12 +1,18 @@
-use mongodb::bson::{doc, oid::ObjectId};
+use tokio_postgres::types::Type;
 
-use crate::{models::service_load_balancer_container_junction_model::ServiceLoadBalancerContainerJunctionInsertBody, utils::mongodb_utils::MongoCollections};
+use crate::utils::postgres_utils::POSTGRES_CLIENT;
 
-pub async fn create(load_balancer_id: &ObjectId, container_id: &ObjectId) -> Result<(), String> {
-	let _insert_result = MongoCollections::LoadBalancerContainerJunction.as_collection::<ServiceLoadBalancerContainerJunctionInsertBody>().insert_one(ServiceLoadBalancerContainerJunctionInsertBody {
-		load_balancer_id: *load_balancer_id,
-		container_id: *container_id,
-	}).await;
-
-	Ok(())
+pub async fn create(load_balancer_id: &i32, container_id: &i32) -> Result<(), String> {
+    let insert_result = POSTGRES_CLIENT.get().unwrap()
+        .query_typed(
+            "INSERT INTO load_balancer_container_junction (load_balancer_fk, container_fk) VALUES ($1, $2)",
+            &[
+                (load_balancer_id, Type::INT4),
+                (container_id, Type::INT4)
+            ]
+         ).await;
+    match insert_result {
+        Ok(_) => Ok(()),
+        Err(err) => Err(err.to_string()),
+    }
 }

@@ -1,16 +1,14 @@
-use bollard::container::StartContainerOptions;
-use serde::{Deserialize, Serialize};
-
 use crate::utils::docker_utils::DOCKER;
+use bollard::container::StartContainerOptions;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug)]
 pub struct ServiceContainer {
     pub id: i32,
     pub container_id: String, // docker internal id of the docker container
     pub public_port: i32,     //
     pub uuid: String,
 }
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug)]
 pub struct ServiceContainerBody {
     pub container_id: String, // docker internal id of the docker container
     pub public_port: usize,   //

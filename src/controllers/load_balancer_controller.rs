@@ -10,14 +10,10 @@ use crate::{
     models::{
         service_container_models::{DockerImageId, ServiceContainer},
         service_image_models::ServiceImage,
-        service_load_balancer::{
-            LoadBalancerEntry, LoadBalancerEntryAggregate, LoadBalancerInsert, ServiceLoadBalancer,
-        },
+        service_load_balancer::ServiceLoadBalancer,
     },
     utils::postgres_utils::POSTGRES_CLIENT,
 };
-
-use super::image_controller::get_image;
 
 pub static LOADBALANCERS: OnceLock<Arc<Mutex<HashMap<DockerImageId, ServiceLoadBalancer>>>> =
     OnceLock::new();
@@ -68,24 +64,27 @@ pub async fn get_load_balancer_with_containers_by_image_id(
             from load_balancers lb
             LEFT JOIN load_balancer_container_junction as lbcj ON lb.id = lbcj.load_balancer_fk
             LEFT JOIN containers as c ON lbcj.container_fk = c.id
-            WHERE lb.image_fk = $1;",&[(&image_fk, Type::INT2)] ).await;
+            WHERE lb.image_fk = $1;",&[(&image_fk, Type::INT4)] ).await;
     match load_balancer_query_results {
         Ok(rows) => {
             let mut containers: Vec<ServiceContainer> = Vec::new();
             let mut id: Option<i32> = None;
             let mut head: Option<i32> = None;
+            println!("{}", &image_fk);
             if !rows.is_empty() {
                 for row in rows.into_iter() {
                     if id.is_none() {
                         id = Some(row.get::<&str, i32>("lb_id"));
                         head = Some(row.get::<&str, i32>("lb_head"));
                     }
-                    containers.push(ServiceContainer {
-                        id: row.get::<&str, i32>("c_id"),
-                        container_id: row.get::<&str, String>("docker_image_id"),
-                        public_port: row.get::<&str, i32>("public_port"),
-                        uuid: row.get::<&str, String>("uuid"),
-                    });
+                    if let Ok(c_id) = row.try_get::<&str, i32>("c_id") {
+                        containers.push(ServiceContainer {
+                            id: c_id,
+                            container_id: row.get::<&str, String>("docker_container_id"),
+                            public_port: row.get::<&str, i32>("public_port"),
+                            uuid: row.get::<&str, String>("uuid"),
+                        });
+                    }
                 }
                 let service_load_balancer: ServiceLoadBalancer = ServiceLoadBalancer {
                     id: id.unwrap(),
@@ -137,8 +136,7 @@ pub async fn get_or_init_load_balancer(
             //this situation is bound to happen and does not need the stars to align(by pure luck)
 
             //awaited load balancer mutex should help us group them if ever the creation of lb might be delayed
-            let mut awaited_lb = AWAITED_LOADBALANCERS.get().unwrap().blocking_lock();
-            //blocking lock it to be prioritized
+            let mut awaited_lb = AWAITED_LOADBALANCERS.get().unwrap().lock().await;
             awaited_lb.insert(service_image.docker_image_id.clone(), vec![]);
             drop(awaited_lb);
 
@@ -164,11 +162,69 @@ pub async fn get_or_init_load_balancer(
                         lb.request_queue = request_queue.unwrap();
                     };
                     drop(awaited_lb_lock);
+                    //trim the containers
+
                     let mut hm = LOADBALANCERS.get().unwrap().lock().await;
-                    let new_lb: bool = lb.containers.len() + lb.awaited_containers.len() == 0;
-                    hm.insert(service_image.docker_image_id.clone(), lb);
-                    drop(hm);
-                    Ok((service_image.docker_image_id, new_lb))
+
+                    let mut container_len = lb.containers.len();
+                    let mut awaited_container_len = lb.awaited_containers.len();
+                    println!(
+                        "pre-validation: {} {}",
+                        &container_len, &awaited_container_len
+                    );
+                    let mut new_lb: bool = container_len + awaited_container_len == 0;
+                    let new_lb_check: Result<(), String> = if !new_lb {
+                        lb.validate_containers().await;
+                        container_len = lb.containers.len();
+                        awaited_container_len = lb.awaited_containers.len();
+                        println!(
+                            "post-validation: {} {}",
+                            &container_len, &awaited_container_len
+                        );
+                        if container_len > 0 {
+                            lb.mode = ELoadBalancerMode::FORWARD;
+                            Ok(())
+                        } else if awaited_container_len > 0 {
+                            println!("having awaited containers");
+                            let awaited_containers = &lb.awaited_containers;
+                            let any_entry = awaited_containers.iter().next().unwrap();
+
+                            let mut awaited_container_lock =
+                                AWAITED_CONTAINERS.get().unwrap().lock().await;
+                            awaited_container_lock
+                                .insert(any_entry.1.uuid.clone(), lb.docker_image_id.clone());
+                            let start_container_result = any_entry.1.start_container().await;
+                            let result = match start_container_result {
+                                Ok(_) => {
+                                    drop(awaited_container_lock);
+                                    Ok(())
+                                }
+                                Err(err) => {
+                                    //remove the entry from the hashmap
+                                    let _remove_option =
+                                        awaited_container_lock.remove(&any_entry.1.uuid);
+                                    drop(awaited_container_lock);
+                                    Err(err.to_string())
+                                }
+                            };
+                            result
+                        } else {
+                            //somehhow goes here
+                            lb.mode = ELoadBalancerMode::FORWARD;
+                            new_lb = true;
+                            Ok(())
+                        }
+                    } else {
+                        Ok(())
+                    };
+                    match new_lb_check {
+                        Ok(_) => {
+                            hm.insert(service_image.docker_image_id.clone(), lb);
+                            drop(hm);
+                            Ok((service_image.docker_image_id, new_lb))
+                        }
+                        Err(err) => Err(err),
+                    }
                 }
 
                 Err(err) => Err(err),

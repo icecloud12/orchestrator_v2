@@ -1,6 +1,5 @@
 use custom_tcp_listener::models::router::response_to_bytes;
-use http::{HeaderMap, StatusCode, Version};
-use hyper::body::Bytes;
+use http::StatusCode;
 use reqwest::Response;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 

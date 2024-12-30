@@ -155,6 +155,7 @@ pub async fn route_to_service_handler(
                                     }
                                 } else {
                                     lb.queue_request(request, tcp_stream);
+                                    println!("stucj queing here");
                                 }
                             }
                         }
@@ -177,76 +178,79 @@ pub async fn container_ready(
     let params = request.parameters;
     let uuid = params.get("uuid").unwrap();
     let awaited_container_mutex = AWAITED_CONTAINERS.get().unwrap();
-    let awaited_containers = awaited_container_mutex.lock().await;
+    let mut awaited_containers = awaited_container_mutex.lock().await;
     println!("awaited containers{:#?}", &awaited_containers);
     println!("uuid: {}", &uuid);
-    let load_balancer_key = awaited_containers.get(uuid).unwrap().clone();
+    let load_balancer_key_option = awaited_containers.remove(uuid);
     drop(awaited_containers);
-    let load_balacer_mutex = LOADBALANCERS.get().unwrap();
-    let mut load_balancers = load_balacer_mutex.lock().await;
-    let service_load_balancer = load_balancers.get_mut(&load_balancer_key).unwrap();
-    let awaited_container_key_val_pair = service_load_balancer
-        .awaited_containers
-        .remove_entry(uuid)
-        .unwrap();
-    let readied_container = awaited_container_key_val_pair.1;
-    let container_port = readied_container.public_port.clone();
-    service_load_balancer.add_container(readied_container);
-    //acknowledge container readyness
-    let empty_body: Vec<u8> = Vec::new();
-    let response_builder = http::Response::builder()
-        .status(StatusCode::OK)
-        .body(empty_body)
-        .unwrap();
-    let response_bytes = response_to_bytes(response_builder);
-    let _write_result = tcp_stream.write_all(&response_bytes).await; //we dont care if it fails
-    let _flush_result = tcp_stream.flush().await;
-    //if the load balancer is queue then change it to forwarding
-    match service_load_balancer.mode {
-        ELoadBalancerMode::QUEUE => {
-            print!("here");
-            service_load_balancer.mode = ELoadBalancerMode::FORWARD;
-            let queue = service_load_balancer.empty_queue();
-            println!("request_queue : {:#?}", &queue);
-            for (request, mut tcp_stream) in queue.into_iter() {
-                let port = container_port.clone();
+    if let Some(load_balancer_key) = load_balancer_key_option {
+        let load_balacer_mutex = LOADBALANCERS.get().unwrap();
+        let mut load_balancers = load_balacer_mutex.lock().await;
+        let service_load_balancer = load_balancers.get_mut(&load_balancer_key).unwrap();
+        let awaited_container_key_val_pair = service_load_balancer
+            .awaited_containers
+            .remove_entry(uuid)
+            .unwrap();
+        let readied_container = awaited_container_key_val_pair.1;
+        let container_port = readied_container.public_port.clone();
+        service_load_balancer.add_container(readied_container);
+        //acknowledge container readyness
+        let empty_body: Vec<u8> = Vec::new();
+        let response_builder = http::Response::builder()
+            .status(StatusCode::OK)
+            .body(empty_body)
+            .unwrap();
+        let response_bytes = response_to_bytes(response_builder);
+        let _write_result = tcp_stream.write_all(&response_bytes).await; //we dont care if it fails
+        let _flush_result = tcp_stream.flush().await;
+        //if the load balancer is queue then change it to forwarding
+        match service_load_balancer.mode {
+            ELoadBalancerMode::QUEUE => {
+                print!("here");
+                service_load_balancer.mode = ELoadBalancerMode::FORWARD;
+                let queue = service_load_balancer.empty_queue();
+                println!("request_queue : {:#?}", &queue);
+                for (request, tcp_stream) in queue.into_iter() {
+                    let port = container_port.clone();
 
-                println!("here");
-                //foward all queued stream to the newly made container
-                //todo NEED TO STORE THE REQUEST INFO AS WELL
-                let client_builder = reqwest::ClientBuilder::new();
-                let client = client_builder
-                    .danger_accept_invalid_certs(true)
-                    .build()
-                    .unwrap();
-                let url = format!("http://localhost:{}{}", port, request.path);
-                println!("url:{}", &url);
-                let send_request_result = client
-                    .request(
-                        reqwest::Method::from_str(request.method.as_str()).unwrap(),
-                        url,
-                    )
-                    .headers(request.headers)
-                    .body(request.body)
-                    .send()
-                    .await;
-                match send_request_result {
-                    Ok(response) => {
-                        return_response(response, tcp_stream).await;
-                    }
-                    Err(_) => {
-                        return_503(tcp_stream).await;
-                    }
-                };
+                    println!("here");
+                    //foward all queued stream to the newly made container
+                    //todo NEED TO STORE THE REQUEST INFO AS WELL
+                    let client_builder = reqwest::ClientBuilder::new();
+                    let client = client_builder
+                        .danger_accept_invalid_certs(true)
+                        .build()
+                        .unwrap();
+                    let url = format!("http://localhost:{}{}", port, request.path);
+                    println!("url:{}", &url);
+                    let send_request_result = client
+                        .request(
+                            reqwest::Method::from_str(request.method.as_str()).unwrap(),
+                            url,
+                        )
+                        .headers(request.headers)
+                        .body(request.body)
+                        .send()
+                        .await;
+                    match send_request_result {
+                        Ok(response) => {
+                            return_response(response, tcp_stream).await;
+                        }
+                        Err(_) => {
+                            return_503(tcp_stream).await;
+                        }
+                    };
+                }
+                service_load_balancer.request_queue = Vec::new();
             }
-            service_load_balancer.request_queue = Vec::new();
-        }
-        ELoadBalancerMode::FORWARD => {
-            //do nothing
+            ELoadBalancerMode::FORWARD => {
+                //do nothing
 
-            print!("here");
-        }
-    };
-    service_load_balancer.request_queue = Vec::new();
+                print!("here");
+            }
+        };
+        service_load_balancer.request_queue = Vec::new();
+    }
+
     Ok(())
 }

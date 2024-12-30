@@ -2,14 +2,20 @@ use std::{fmt::Display, sync::OnceLock};
 use tokio_postgres::{Client, NoTls};
 
 pub static POSTGRES_CLIENT: OnceLock<Client> = OnceLock::new();
-pub async fn connect() {
-    let (client, connection) =
-        tokio_postgres::connect("host=localhost user=postgres password=root dbname=orchestrator", NoTls)
-            .await
-            .unwrap();
+pub async fn connect(db_host: String, db_user: String, db_pass: String, db_name: String) {
+    let (client, connection) = tokio_postgres::connect(
+        format!(
+            "host={} user={} password={} dbname={}",
+            db_host, db_user, db_pass, db_name,
+        )
+        .as_str(),
+        NoTls,
+    )
+    .await
+    .unwrap();
     tokio::spawn(async move {
         if let Err(e) = connection.await {
-            eprintln!("POSTGRES connection error: {}",e);
+            eprintln!("POSTGRES connection error: {}", e);
         }
     });
     //it's ok for it to crash since it is still on initialization phase and is a requirement

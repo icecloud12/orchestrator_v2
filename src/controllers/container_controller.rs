@@ -61,18 +61,18 @@ pub async fn create_container(
         Ok(res) => {
             //insert into db the container
             let container_insert_result= POSTGRES_CLIENT.get().unwrap().query_typed
-				("INSERT INTO containers (docker_congtainer_id, public_port, uuid) VALUES ($1, $2, $3) RETURNING id;",
+				("INSERT INTO containers (docker_container_id, public_port, uuid) VALUES ($1, $2, $3) RETURNING id;",
 				&[
 					(&res.id, Type::TEXT),
 					(&local_port, Type::INT4),
-					(&uuid, Type::INT4)
+					(&uuid, Type::TEXT)
 				]).await;
             match container_insert_result {
                 Ok(rows) => {
                     //we are only expect 1 result
                     let row = &rows[0];
                     Ok(ServiceContainer {
-                        id: row.get::<&str, i32>("get"),
+                        id: row.get::<&str, i32>("id"),
                         container_id: res.id,
                         public_port: local_port,
                         uuid,

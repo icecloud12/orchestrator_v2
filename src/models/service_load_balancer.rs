@@ -2,14 +2,13 @@ use std::collections::HashMap;
 
 use bollard::{container::ListContainersOptions, service::ContainerStateStatusEnum};
 use custom_tcp_listener::models::types::Request;
-use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tokio_postgres::types::Type;
 
 use crate::{
     controllers::{
-        container_controller, load_balancer_container_junction,
-        load_balancer_controller::{ELoadBalancerBehavior, ELoadBalancerMode, AWAITED_CONTAINERS},
+        container_controller, 
+        load_balancer_controller::{ELoadBalancerBehavior, ELoadBalancerMode, AWAITED_CONTAINERS}, load_balancer_container_junction_controller,
     },
     utils::{docker_utils::DOCKER, postgres_utils::POSTGRES_CLIENT},
 };
@@ -68,11 +67,12 @@ impl ServiceLoadBalancer {
     ///the container array size differ depending on:
     /// 1. if it's newly created
     /// 2. the recorded load_balancer in the database have/have no entries
-    pub async fn next_container(&mut self) -> Result<usize, ()> {
+    //returns Ok((Option<container_port>, Option<AwaitedContainerInstance>),()>
+    pub async fn next_container(&mut self) -> Result<i32, ()> {
         let containers = &self.containers;
 
-        let container_len = containers.len();
-        let ret: Result<usize, ()> = if container_len == 0 {
+        let container_len:i32 = containers.len() as i32;
+        let ret: Result<i32, ()> = if container_len == 0 {
             // let create_container_result = self.create_container().await;
             // //maybe create some logic before creating the container here for scalability logic
             // match create_container_result {
@@ -85,7 +85,7 @@ impl ServiceLoadBalancer {
             //move the head
             let head = &mut self.head;
             *head = (*head + 1) % container_len;
-            let public_port = containers.get(*head).unwrap().public_port.clone();
+            let public_port = containers.get(*head as usize).unwrap().public_port.clone();
             Ok(public_port)
         };
         ret
@@ -97,7 +97,7 @@ impl ServiceLoadBalancer {
 
         match col {
             Ok(service_container) => {
-                let _ = load_balancer_container_junction::create(&self._id, &service_container._id)
+                let _ = load_balancer_container_junction_controller::create(&self.id, &service_container.id)
                     .await;
                 Ok(service_container)
             }
@@ -129,7 +129,6 @@ impl ServiceLoadBalancer {
         let mut filters = HashMap::new();
 
         filters.insert("id", container_map.keys().map(|k| k.as_str()).collect());
-        println!("{:#?}", filters);
         let options = ListContainersOptions {
             all: true,
             filters,
@@ -138,7 +137,6 @@ impl ServiceLoadBalancer {
         let docker = DOCKER.get().unwrap();
         let _container_list_result = match docker.list_containers(Some(options)).await {
             Ok(container_list) => {
-                println!("{:#?}", container_list);
                 for container_summary in container_list.into_iter() {
                     let container_status = container_summary.state.unwrap();
                     if container_status == ContainerStateStatusEnum::RUNNING.as_ref() {
@@ -156,54 +154,18 @@ impl ServiceLoadBalancer {
 
                         let mut await_container_lock =
                             AWAITED_CONTAINERS.get().unwrap().lock().await;
-                        match container.start_container().await {
-                            Ok(_) => {
-                                let uuid = container.uuid.clone();
-                                await_container_lock
-                                    .insert(uuid.clone(), self.docker_image_id.clone());
-                                let awaited_containers = &mut self.awaited_containers;
-                                awaited_containers.insert(uuid, container);
-                            }
-                            Err(_docker_container_start_error) => {
-                                println!("{}", _docker_container_start_error);
-                                //remove mongodb row for container and junction
-                                //remove existing docker container
-                            }
-                        };
+                            let uuid = container.uuid.clone();
+                            await_container_lock
+                                .insert(uuid.clone(), self.docker_image_id.clone());
+                            let awaited_containers = &mut self.awaited_containers;
+                            awaited_containers.insert(uuid, container);
+                            
                     };
                 }
                 Ok(())
             }
             Err(docker_container_list_error) => Err(docker_container_list_error.to_string()),
         };
-        println!("exiting validation");
     }
 }
-//this struct represents the data from mongodb
-//will be used to quickly restore the load-balancers from the old state just incase
-//if the orchestrator is closed due to user intervention but docker isn't
-//load from cache thingy-majig if that makes sense
-#[derive(Deserialize, Serialize, Debug)]
-pub struct LoadBalancerEntryAggregate {
-    pub _id: ObjectId,
-    pub mongo_image_reference: ObjectId, //mongo_image_reference
-    pub head: usize,
-    pub behavior: String,
-    pub containers: Vec<ServiceContainer>,
-}
 
-#[derive(Deserialize, Serialize)]
-pub struct LoadBalancerEntry {
-    pub _id: ObjectId,
-    pub mongo_image_reference: ObjectId, //mongo_image_reference
-    pub head: usize,
-    pub behavior: String,
-}
-
-///struct for insert purposes only
-#[derive(Serialize)]
-pub struct LoadBalancerInsert {
-    pub mongo_image_reference: ObjectId, //mongo_image_reference
-    pub head: usize,
-    pub behavior: String,
-}
