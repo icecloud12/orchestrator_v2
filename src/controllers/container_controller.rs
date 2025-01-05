@@ -10,7 +10,9 @@ use uuid::Uuid;
 
 use crate::{
     models::service_container_models::ServiceContainer,
-    utils::{docker_utils::DOCKER, postgres_utils::POSTGRES_CLIENT},
+    utils::{
+        docker_utils::DOCKER, orchestrator_utils::ORCHESTRATOR_URI, postgres_utils::POSTGRES_CLIENT,
+    },
 };
 
 ///load_balancer_key is the docker_image_id
@@ -53,7 +55,13 @@ pub async fn create_container(
     let config = Config {
         image: Some(docker_image_id.to_owned()),
         host_config: Some(host_config),
-        env: Some(vec![format!("uuid={}", uuid.clone())]),
+        env: Some(vec![
+            format!("uuid={}", uuid.clone()),
+            format!(
+                "orchestrator_uri={}",
+                ORCHESTRATOR_URI.get().unwrap().as_str()
+            ),
+        ]),
         ..Default::default()
     };
     let create_container_result = docker.create_container(options, config).await;

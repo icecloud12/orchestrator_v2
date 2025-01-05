@@ -1,8 +1,11 @@
+use std::sync::OnceLock;
+
 use custom_tcp_listener::models::router::response_to_bytes;
 use http::StatusCode;
 use reqwest::Response;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 
+pub static ORCHESTRATOR_URI: OnceLock<String> = OnceLock::new();
 pub async fn return_404(mut tcp_stream: TcpStream) {
     let body: Vec<u8> = Vec::new();
     let response_builder = http::Response::builder()

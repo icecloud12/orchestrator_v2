@@ -120,7 +120,10 @@ impl ServiceLoadBalancer {
     pub fn empty_queue(&mut self) -> Vec<(Request, TcpStream)> {
         std::mem::take(&mut self.request_queue)
     }
-    pub async fn validate_containers(&mut self) {
+    ///This function returns an Option of Vec<ServiceContainer> where
+    ///The Vec<i32> defines the invalid container id(s) to prune out of the db rows
+    ///for both load_balancer_container_junction and container tables
+    pub async fn validate_containers(&mut self) -> Result<Option<Vec<i32>>,String> {
         let containers: Vec<ServiceContainer> = std::mem::take(&mut self.containers);
         let mut container_map: HashMap<String, ServiceContainer> = HashMap::new();
         containers.into_iter().for_each(|container| {
@@ -135,8 +138,10 @@ impl ServiceLoadBalancer {
             ..Default::default()
         };
         let docker = DOCKER.get().unwrap();
-        let _container_list_result = match docker.list_containers(Some(options)).await {
+        let container_list_result = match docker.list_containers(Some(options)).await {
             Ok(container_list) => {
+                let mut await_container_lock = AWAITED_CONTAINERS.get().unwrap().lock().await;
+                
                 for container_summary in container_list.into_iter() {
                     let container_status = container_summary.state.unwrap();
                     if container_status == ContainerStateStatusEnum::RUNNING.as_ref() {
@@ -151,9 +156,6 @@ impl ServiceLoadBalancer {
                             .unwrap();
                         //if we cannot start the container we must remove the container from db and docker
                         //await the containers before trying to start
-
-                        let mut await_container_lock =
-                            AWAITED_CONTAINERS.get().unwrap().lock().await;
                             let uuid = container.uuid.clone();
                             await_container_lock
                                 .insert(uuid.clone(), self.docker_image_id.clone());
@@ -162,10 +164,29 @@ impl ServiceLoadBalancer {
                             
                     };
                 }
-                Ok(())
+                if container_map.is_empty() {
+                    Ok(None)
+                }else{
+                    Ok(Some(
+                        container_map.into_iter().map( |(_key, container)| {
+                            container.id
+                        }).collect()
+                    ))
+                }
+                
+                //lock should be dropped here
             }
             Err(docker_container_list_error) => Err(docker_container_list_error.to_string()),
         };
+        container_list_result
+    }
+    pub async fn remove_containers(&self, container_ids: Vec<i32>) {
+        let client = POSTGRES_CLIENT.get().unwrap();
+        let delete_result = client.query_typed( "DELETE from load_balancer_container_junction where container_fk = any($1)",&[(&container_ids, Type::INT4_ARRAY)]).await;
+        if delete_result.is_ok() {
+            
+            let _delete_container_result = client.query_typed("DELETE FROM containers where id = ANY($1)", &[(&container_ids, Type::INT4_ARRAY)]).await;
+        }
     }
 }
 

@@ -54,7 +54,7 @@ pub async fn route_to_service_handler(
                     } else {
                         drop(awaited_lb_lock);
                         //dropping the lock here because it is used on the next function
-                        let (lb_key, new_lb) = get_or_init_load_balancer(
+                        let (lb_key, new_lb, option_pruned_containers) = get_or_init_load_balancer(
                             image_fk,
                             prefix,
                             exposed_port,
@@ -158,6 +158,11 @@ pub async fn route_to_service_handler(
                                     println!("stucj queing here");
                                 }
                             }
+                        };
+
+                        //prune the containers //it is okay to fail here
+                        if let Some(container_ids) = option_pruned_containers {
+                            lb.remove_containers(container_ids).await;
                         }
                     }
                 }
@@ -206,14 +211,11 @@ pub async fn container_ready(
         //if the load balancer is queue then change it to forwarding
         match service_load_balancer.mode {
             ELoadBalancerMode::QUEUE => {
-                print!("here");
                 service_load_balancer.mode = ELoadBalancerMode::FORWARD;
                 let queue = service_load_balancer.empty_queue();
                 println!("request_queue : {:#?}", &queue);
                 for (request, tcp_stream) in queue.into_iter() {
                     let port = container_port.clone();
-
-                    println!("here");
                     //foward all queued stream to the newly made container
                     //todo NEED TO STORE THE REQUEST INFO AS WELL
                     let client_builder = reqwest::ClientBuilder::new();

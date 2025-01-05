@@ -9,6 +9,7 @@ use custom_tcp_listener::models::router::Router;
 use dotenv::dotenv;
 use handlers::route_to_service_handler::{container_ready, route_to_service_handler};
 use std::env;
+use utils::orchestrator_utils::ORCHESTRATOR_URI;
 use utils::{docker_utils, postgres_utils};
 
 mod controllers;
@@ -99,7 +100,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     docker_utils::connect();
     postgres_utils::connect(database_uri, database_user, database_pass, database_name).await;
     load_balancer_controller::init();
+    let address: String = format!("http://{}:{}", &listening_address, &listening_port);
 
+    ORCHESTRATOR_URI.get_or_init(|| address);
     //there is no way shape or form this would miss
     let router = Router::new()
         .route(
@@ -117,7 +120,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/*".to_string(), trace(route_to_service_handler));
     bind(
         router,
-        format!("{}:{}", listening_address, listening_port).as_str(),
+        format!("{}:{}", &listening_address, &listening_port).as_str(),
     )
     .await?;
     return Ok(());
