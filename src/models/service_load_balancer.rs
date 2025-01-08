@@ -180,7 +180,7 @@ impl ServiceLoadBalancer {
         };
         container_list_result
     }
-    pub async fn remove_containers(&self, container_ids: Vec<i32>) {
+    pub async fn remove_containers(container_ids: Vec<i32>) {
         let client = POSTGRES_CLIENT.get().unwrap();
         let delete_result = client.query_typed( "DELETE from load_balancer_container_junction where container_fk = any($1)",&[(&container_ids, Type::INT4_ARRAY)]).await;
         if delete_result.is_ok() {

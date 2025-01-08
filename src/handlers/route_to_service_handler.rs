@@ -12,7 +12,10 @@ use crate::{
         },
         route_controller::route_resolver,
     },
-    models::{service_image_models::ServiceImage, service_route_model::ServiceRoute},
+    models::{
+        service_image_models::ServiceImage, service_load_balancer::ServiceLoadBalancer,
+        service_route_model::ServiceRoute,
+    },
     utils::orchestrator_utils::{return_404, return_500, return_503, return_response},
 };
 
@@ -159,10 +162,10 @@ pub async fn route_to_service_handler(
                                 }
                             }
                         };
-
+                        drop(lb_hm);
                         //prune the containers //it is okay to fail here
                         if let Some(container_ids) = option_pruned_containers {
-                            lb.remove_containers(container_ids).await;
+                            ServiceLoadBalancer::remove_containers(container_ids).await;
                         }
                     }
                 }
