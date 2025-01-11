@@ -24,6 +24,16 @@ pub async fn connect(db_host: String, db_user: String, db_pass: String, db_name:
 //table enums
 pub enum TABLES {
     SERVICE_ROUTE,
+    SERVICE_REQUEST,
+}
+
+impl Display for TABLES {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Self::SERVICE_ROUTE => write!(f, "routes"),
+            Self::SERVICE_REQUEST => write!(f, "requests"),
+        }
+    }
 }
 
 pub enum ServiceRouteColumns {
@@ -67,3 +77,32 @@ impl ServiceImageColumns {
         }
     }
 }
+
+pub enum ServiceRequestColumns {
+    ID,
+    PATH,
+    UUID,
+    REQUEST_TIME,
+    RESPONSE_TIME,
+    CONTAINER_FK,
+    METHOD,
+    STATUS_CODE,
+}
+
+impl Display for ServiceRequestColumns {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Self::ID => write!(f, "id"),
+            Self::PATH => write!(f, "path"),
+            Self::UUID => write!(f, "uuid"),
+            Self::REQUEST_TIME => write!(f, "request_time"),
+            Self::RESPONSE_TIME => write!(f, "response_time"),
+            Self::CONTAINER_FK => write!(f, "container_fk"),
+            Self::METHOD => write!(f, "method"),
+            Self::STATUS_CODE => write!(f, "status_code"),
+        }
+    }
+}
+
+   
+

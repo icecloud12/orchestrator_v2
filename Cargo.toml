@@ -20,4 +20,4 @@ tokio = { version = "1.40.0", features = ["full"] }
 rand = "0.8.5"
 uuid = { version = "1.11.0", features = ["v4"] }
 custom-tcp-listener = { git = "https://github.com/icecloud12/custom-tcp-listener.git" }
-tokio-postgres = "0.7.12"
+tokio-postgres = { version = "0.7.12", features = ["with-uuid-1"] }

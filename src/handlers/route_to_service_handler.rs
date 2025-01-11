@@ -3,6 +3,7 @@ use std::{error::Error, str::FromStr};
 use custom_tcp_listener::models::{router::response_to_bytes, types::Request};
 use http::StatusCode;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
+use uuid::Uuid;
 
 use crate::{
     controllers::{
@@ -10,11 +11,12 @@ use crate::{
             get_or_init_load_balancer, ELoadBalancerMode, AWAITED_CONTAINERS,
             AWAITED_LOADBALANCERS, LOADBALANCERS,
         },
+        request_controller::{record_service_request_acceptance, record_service_request_responded},
         route_controller::route_resolver,
     },
     models::{
-        service_image_models::ServiceImage, service_load_balancer::ServiceLoadBalancer,
-        service_route_model::ServiceRoute,
+        service_container_models::ServiceContainer, service_image_models::ServiceImage,
+        service_load_balancer::ServiceLoadBalancer, service_route_model::ServiceRoute,
     },
     utils::orchestrator_utils::{return_404, return_500, return_503, return_response},
 };
@@ -39,6 +41,11 @@ pub async fn route_to_service_handler(
                     .await
                 }
                 (Some(service_route), Some(service_image)) => {
+                    //CREATE THE REQUEST STRUCT HERE
+                    let service_request_uuid: Uuid = record_service_request_acceptance(
+                        request.path.clone(),
+                        request.method.clone(),
+                    );
                     let ServiceRoute {
                         image_fk,
                         prefix,
@@ -52,7 +59,7 @@ pub async fn route_to_service_handler(
                     if let Some(awaited_lb) =
                         awaited_lb_lock.get_mut(&service_image.docker_image_id)
                     {
-                        awaited_lb.push((request, tcp_stream));
+                        awaited_lb.push((request, tcp_stream, service_request_uuid));
                         drop(awaited_lb_lock);
                     } else {
                         drop(awaited_lb_lock);
@@ -73,7 +80,7 @@ pub async fn route_to_service_handler(
                             ELoadBalancerMode::FORWARD => {
                                 let next_container_result = lb.next_container().await;
                                 match next_container_result {
-                                    Ok(container_public_port) => {
+                                    Ok((container_public_port, container_id)) => {
                                         println!("next-container-succes");
                                         let client_builder = reqwest::ClientBuilder::new();
                                         let client = client_builder
@@ -82,7 +89,7 @@ pub async fn route_to_service_handler(
                                             .unwrap();
                                         let url = format!(
                                             "http://localhost:{}{}",
-                                            container_public_port, request.path
+                                            &container_public_port, request.path
                                         );
 
                                         let send_request_result: Result<
@@ -100,11 +107,25 @@ pub async fn route_to_service_handler(
                                             .await;
                                         match send_request_result {
                                             Ok(response) => {
+                                                let response_status =
+                                                    response.status().as_u16() as i32;
                                                 return_response(response, tcp_stream).await;
+                                                record_service_request_responded(
+                                                    service_request_uuid,
+                                                    &container_id,
+                                                    response_status,
+                                                )
+                                                .await;
                                             }
                                             Err(_) => {
                                                 //errors concerning the connection towards the address
                                                 return_503(tcp_stream).await;
+                                                record_service_request_responded(
+                                                    service_request_uuid, //formatting why do you do this man
+                                                    &container_id,
+                                                    503,
+                                                )
+                                                .await;
                                             }
                                         }
                                     }
@@ -119,18 +140,34 @@ pub async fn route_to_service_handler(
                                                 match new_container.start_container().await {
                                                     Ok(_) => {
                                                         lb.mode = ELoadBalancerMode::QUEUE;
-                                                        lb.queue_request(request, tcp_stream);
+                                                        lb.queue_request(
+                                                            request,
+                                                            tcp_stream,
+                                                            service_request_uuid,
+                                                        );
                                                         lb.queue_container(new_container).await;
                                                     }
                                                     Err(docker_start_error) => {
                                                         return_500(tcp_stream, docker_start_error)
                                                             .await;
+                                                        record_service_request_responded(
+                                                            service_request_uuid,
+                                                            &new_container.id,
+                                                            500,
+                                                        )
+                                                        .await;
                                                     }
                                                 }
                                             }
                                             Err(docker_create_error) => {
                                                 println!("create-container-fail");
                                                 return_500(tcp_stream, docker_create_error).await;
+                                                record_service_request_responded(
+                                                    service_request_uuid, //formatting why do you do this man
+                                                    &-1,
+                                                    500,
+                                                )
+                                                .await;
                                             }
                                         }
                                     }
@@ -143,21 +180,39 @@ pub async fn route_to_service_handler(
                                             match new_container.start_container().await {
                                                 Ok(_container_start_success) => {
                                                     println!("queueing container");
-                                                    lb.queue_request(request, tcp_stream);
+                                                    lb.queue_request(
+                                                        request,
+                                                        tcp_stream,
+                                                        service_request_uuid,
+                                                    );
                                                     lb.queue_container(new_container).await;
                                                 }
                                                 Err(container_start_error) => {
                                                     return_500(tcp_stream, container_start_error)
                                                         .await;
+
+                                                    record_service_request_responded(
+                                                        service_request_uuid, //formatting why do you do this man
+                                                        &new_container.id,
+                                                        500,
+                                                    )
+                                                    .await;
                                                 }
                                             }
                                         }
                                         Err(container_create_error) => {
                                             return_500(tcp_stream, container_create_error).await;
+
+                                            record_service_request_responded(
+                                                service_request_uuid, //formatting why do you do this man
+                                                &-1,
+                                                500,
+                                            )
+                                            .await;
                                         }
                                     }
                                 } else {
-                                    lb.queue_request(request, tcp_stream);
+                                    lb.queue_request(request, tcp_stream, service_request_uuid);
                                     println!("stucj queing here");
                                 }
                             }
@@ -200,8 +255,14 @@ pub async fn container_ready(
             .remove_entry(uuid)
             .unwrap();
         let readied_container = awaited_container_key_val_pair.1;
-        let container_port = readied_container.public_port.clone();
-        service_load_balancer.add_container(readied_container);
+
+        let container_ref: &ServiceContainer =
+            service_load_balancer.add_container(readied_container);
+        let &ServiceContainer {
+            id: container_fk,
+            public_port: container_port,
+            ..
+        } = container_ref;
         //acknowledge container readyness
         let empty_body: Vec<u8> = Vec::new();
         let response_builder = http::Response::builder()
@@ -216,9 +277,9 @@ pub async fn container_ready(
             ELoadBalancerMode::QUEUE => {
                 service_load_balancer.mode = ELoadBalancerMode::FORWARD;
                 let queue = service_load_balancer.empty_queue();
+
                 println!("request_queue : {:#?}", &queue);
-                for (request, tcp_stream) in queue.into_iter() {
-                    let port = container_port.clone();
+                for (request, tcp_stream, service_request_uuid) in queue.into_iter() {
                     //foward all queued stream to the newly made container
                     //todo NEED TO STORE THE REQUEST INFO AS WELL
                     let client_builder = reqwest::ClientBuilder::new();
@@ -226,7 +287,7 @@ pub async fn container_ready(
                         .danger_accept_invalid_certs(true)
                         .build()
                         .unwrap();
-                    let url = format!("http://localhost:{}{}", port, request.path);
+                    let url = format!("http://localhost:{}{}", &container_port, request.path);
                     println!("url:{}", &url);
                     let send_request_result = client
                         .request(
@@ -239,7 +300,14 @@ pub async fn container_ready(
                         .await;
                     match send_request_result {
                         Ok(response) => {
+                            let response_status = response.status().as_u16() as i32;
                             return_response(response, tcp_stream).await;
+                            record_service_request_responded(
+                                service_request_uuid,
+                                &container_fk,
+                                response_status,
+                            )
+                            .await;
                         }
                         Err(_) => {
                             return_503(tcp_stream).await;

@@ -9,6 +9,7 @@ use custom_tcp_listener::models::router::Router;
 use dotenv::dotenv;
 use handlers::route_to_service_handler::{container_ready, route_to_service_handler};
 use std::env;
+use tokio::sync::mpsc::Receiver;
 use utils::orchestrator_utils::ORCHESTRATOR_URI;
 use utils::{docker_utils, postgres_utils};
 
@@ -104,6 +105,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     ORCHESTRATOR_URI.get_or_init(|| address);
     //there is no way shape or form this would miss
+    // let mut rx: Receiver<SenderParameter> = request_channel_init();
+
     let router = Router::new()
         .route(
             "/orchestrator/container/ready/:uuid:".to_string(),
@@ -118,10 +121,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/*".to_string(), post(route_to_service_handler))
         .route("/*".to_string(), put(route_to_service_handler))
         .route("/*".to_string(), trace(route_to_service_handler));
-    bind(
+    let _ = bind(
         router,
         format!("{}:{}", &listening_address, &listening_port).as_str(),
     )
-    .await?;
-    return Ok(());
+    .await;
+
+    Ok(())
 }

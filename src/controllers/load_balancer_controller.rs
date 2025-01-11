@@ -5,6 +5,7 @@ use std::{
 };
 use tokio::{net::TcpStream, sync::Mutex};
 use tokio_postgres::types::Type;
+use uuid::Uuid;
 
 use crate::{
     models::{
@@ -18,7 +19,7 @@ use crate::{
 pub static LOADBALANCERS: OnceLock<Arc<Mutex<HashMap<DockerImageId, ServiceLoadBalancer>>>> =
     OnceLock::new();
 pub static AWAITED_LOADBALANCERS: OnceLock<
-    Arc<Mutex<HashMap<DockerImageId, Vec<(Request, TcpStream)>>>>,
+    Arc<Mutex<HashMap<DockerImageId, Vec<(Request, TcpStream, Uuid)>>>>,
 > = OnceLock::new();
 pub static AWAITED_CONTAINERS: OnceLock<Arc<Mutex<HashMap<String, String>>>> = OnceLock::new();
 #[derive(Debug)]
@@ -156,7 +157,7 @@ pub async fn get_or_init_load_balancer(
                     let mut awaited_lb_lock = awaited_lb_mutex.lock().await;
 
                     //the queue might be empty;
-                    let request_queue: Option<Vec<(Request, TcpStream)>> =
+                    let request_queue: Option<Vec<(Request, TcpStream, Uuid)>> =
                         awaited_lb_lock.remove(&service_image.docker_image_id);
                     if request_queue.is_some() {
                         lb.request_queue = request_queue.unwrap();

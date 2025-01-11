@@ -4,6 +4,7 @@ use bollard::{container::ListContainersOptions, service::ContainerStateStatusEnu
 use custom_tcp_listener::models::types::Request;
 use tokio::net::TcpStream;
 use tokio_postgres::types::Type;
+use uuid::Uuid;
 
 use crate::{
     controllers::{
@@ -28,7 +29,7 @@ pub struct ServiceLoadBalancer {
     pub containers: Vec<ServiceContainer>, //docker_container_id_instances
     pub awaited_containers: HashMap<String, ServiceContainer>, //docker_containers not pushed to the active container vector
     pub validated: bool, //initially false to let the program know if the containers are checke,
-    pub request_queue: Vec<(Request, TcpStream)>,
+    pub request_queue: Vec<(Request, TcpStream, Uuid)>,
 }
 
 impl ServiceLoadBalancer {
@@ -68,11 +69,11 @@ impl ServiceLoadBalancer {
     /// 1. if it's newly created
     /// 2. the recorded load_balancer in the database have/have no entries
     //returns Ok((Option<container_port>, Option<AwaitedContainerInstance>),()>
-    pub async fn next_container(&mut self) -> Result<i32, ()> {
+    pub async fn next_container(&mut self) -> Result<(i32,i32), ()> {
         let containers = &self.containers;
 
         let container_len:i32 = containers.len() as i32;
-        let ret: Result<i32, ()> = if container_len == 0 {
+        let ret: Result<(i32, i32), ()> = if container_len == 0 {
             // let create_container_result = self.create_container().await;
             // //maybe create some logic before creating the container here for scalability logic
             // match create_container_result {
@@ -85,8 +86,10 @@ impl ServiceLoadBalancer {
             //move the head
             let head = &mut self.head;
             *head = (*head + 1) % container_len;
-            let public_port = containers.get(*head as usize).unwrap().public_port.clone();
-            Ok(public_port)
+            let container_ref = containers.get(*head as usize).unwrap();
+            let public_port = container_ref.public_port.clone();
+            let container_fk = container_ref.id.clone();
+            Ok((public_port, container_fk))
         };
         ret
     }
@@ -104,12 +107,14 @@ impl ServiceLoadBalancer {
             Err(err) => Err(err),
         }
     }
-    pub fn queue_request(&mut self, request: Request, tcp_stream: TcpStream) {
-        self.request_queue.push((request, tcp_stream));
+    pub fn queue_request(&mut self, request: Request, tcp_stream: TcpStream, request_uuid: Uuid) {
+        self.request_queue.push((request, tcp_stream, request_uuid));
     }
-    pub fn add_container(&mut self, container: ServiceContainer) {
+    pub fn add_container(&mut self, container: ServiceContainer) -> &ServiceContainer {
         let containers = &mut self.containers;
         containers.push(container);
+        let container_ref = containers.last().unwrap();
+        container_ref
     }
     pub async fn queue_container(&mut self, container: ServiceContainer) {
         let mut await_container_lock = AWAITED_CONTAINERS.get().unwrap().lock().await;
@@ -117,7 +122,7 @@ impl ServiceLoadBalancer {
         let awaited_containers = &mut self.awaited_containers;
         awaited_containers.insert(container.uuid.clone(), container);
     }
-    pub fn empty_queue(&mut self) -> Vec<(Request, TcpStream)> {
+    pub fn empty_queue(&mut self) -> Vec<(Request, TcpStream, Uuid)> {
         std::mem::take(&mut self.request_queue)
     }
     ///This function returns an Option of Vec<ServiceContainer> where
