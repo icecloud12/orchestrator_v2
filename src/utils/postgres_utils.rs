@@ -87,6 +87,7 @@ pub enum ServiceRequestColumns {
     CONTAINER_FK,
     METHOD,
     STATUS_CODE,
+    ORCHESTRATOR_INSTANCE,
 }
 
 impl Display for ServiceRequestColumns {
@@ -100,9 +101,7 @@ impl Display for ServiceRequestColumns {
             Self::CONTAINER_FK => write!(f, "container_fk"),
             Self::METHOD => write!(f, "method"),
             Self::STATUS_CODE => write!(f, "status_code"),
+            Self::ORCHESTRATOR_INSTANCE => write!(f, "orchestrator_instance"),
         }
     }
 }
-
-   
-

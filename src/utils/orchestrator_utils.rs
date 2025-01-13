@@ -4,8 +4,10 @@ use custom_tcp_listener::models::router::response_to_bytes;
 use http::StatusCode;
 use reqwest::Response;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
+use uuid::Uuid;
 
 pub static ORCHESTRATOR_URI: OnceLock<String> = OnceLock::new();
+pub static ORCHESTRATOR_UUID: OnceLock<Uuid> = OnceLock::new();
 pub async fn return_404(mut tcp_stream: TcpStream) {
     let body: Vec<u8> = Vec::new();
     let response_builder = http::Response::builder()
@@ -48,10 +50,10 @@ pub async fn return_response(response: Response, mut tcp_stream: TcpStream) {
         response_builder = response_builder.header(k, v)
     }
 
-    let content_length = response.content_length();
-    let mut body_bytes: Option<Vec<u8>> = Some(Vec::new());
-    let mut byte_response: Option<Vec<u8>> = None;
-    if content_length.is_some() {
+    let content_length: bool = response.content_length().is_some();
+    let body_bytes: Option<Vec<u8>>;
+    let byte_response: Option<Vec<u8>>;
+    if content_length {
         body_bytes = Some(response.bytes().await.unwrap().to_vec());
         byte_response = Some(response_to_bytes(
             response_builder.body(body_bytes.unwrap()).unwrap(),

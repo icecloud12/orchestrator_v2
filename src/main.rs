@@ -10,8 +10,9 @@ use dotenv::dotenv;
 use handlers::route_to_service_handler::{container_ready, route_to_service_handler};
 use std::env;
 use tokio::sync::mpsc::Receiver;
-use utils::orchestrator_utils::ORCHESTRATOR_URI;
+use utils::orchestrator_utils::{ORCHESTRATOR_URI, ORCHESTRATOR_UUID};
 use utils::{docker_utils, postgres_utils};
+use uuid::Uuid;
 
 mod controllers;
 mod handlers;
@@ -104,6 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let address: String = format!("http://{}:{}", &listening_address, &listening_port);
 
     ORCHESTRATOR_URI.get_or_init(|| address);
+    ORCHESTRATOR_UUID.get_or_init(|| Uuid::new_v4());
     //there is no way shape or form this would miss
     // let mut rx: Receiver<SenderParameter> = request_channel_init();
 

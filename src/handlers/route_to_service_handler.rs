@@ -75,13 +75,13 @@ pub async fn route_to_service_handler(
                         let lb_mutex = LOADBALANCERS.get().unwrap();
                         let mut lb_hm = lb_mutex.lock().await;
                         let lb = lb_hm.get_mut(&lb_key).unwrap();
-                        println!("{:#?}", &lb);
+                        // println!("{:#?}", &lb);
                         match lb.mode {
                             ELoadBalancerMode::FORWARD => {
                                 let next_container_result = lb.next_container().await;
                                 match next_container_result {
                                     Ok((container_public_port, container_id)) => {
-                                        println!("next-container-succes");
+                                        // println!("next-container-succes");
                                         let client_builder = reqwest::ClientBuilder::new();
                                         let client = client_builder
                                             .danger_accept_invalid_certs(true)
@@ -132,10 +132,10 @@ pub async fn route_to_service_handler(
                                     Err(_) => {
                                         //cannot next as it is empty
                                         //create the container here
-                                        println!("next-container-fail");
+                                        // println!("next-container-fail");
                                         match lb.create_container().await {
                                             Ok(new_container) => {
-                                                println!("create-container-success");
+                                                // println!("create-container-success");
                                                 //created  successfully
                                                 match new_container.start_container().await {
                                                     Ok(_) => {
