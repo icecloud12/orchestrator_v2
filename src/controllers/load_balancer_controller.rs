@@ -1,6 +1,7 @@
 use custom_tcp_listener::models::types::Request;
 use std::{
     collections::HashMap,
+    ops::Deref,
     sync::{Arc, OnceLock},
 };
 use tokio::{net::TcpStream, sync::Mutex};
@@ -19,7 +20,7 @@ use crate::{
 pub static LOADBALANCERS: OnceLock<Arc<Mutex<HashMap<DockerImageId, ServiceLoadBalancer>>>> =
     OnceLock::new();
 pub static AWAITED_LOADBALANCERS: OnceLock<
-    Arc<Mutex<HashMap<DockerImageId, Vec<(Request, TcpStream, Uuid)>>>>,
+    Arc<Mutex<HashMap<DockerImageId, Vec<(Request, TcpStream, Arc<Uuid>)>>>>,
 > = OnceLock::new();
 pub static AWAITED_CONTAINERS: OnceLock<Arc<Mutex<HashMap<String, String>>>> = OnceLock::new();
 #[derive(Debug)]
@@ -55,7 +56,7 @@ pub fn init() {
     AWAITED_LOADBALANCERS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())));
 }
 pub async fn get_load_balancer_with_containers_by_image_id(
-    image_fk: i32,
+    image_fk: Arc<i32>,
     docker_image_id: String,
     exposed_port: String,
     address: String,
@@ -65,7 +66,7 @@ pub async fn get_load_balancer_with_containers_by_image_id(
             from load_balancers lb
             LEFT JOIN load_balancer_container_junction as lbcj ON lb.id = lbcj.load_balancer_fk
             LEFT JOIN containers as c ON lbcj.container_fk = c.id
-            WHERE lb.image_fk = $1;",&[(&image_fk, Type::INT4)] ).await;
+            WHERE lb.image_fk = $1;",&[(image_fk.as_ref(), Type::INT4)] ).await;
     match load_balancer_query_results {
         Ok(rows) => {
             let mut containers: Vec<ServiceContainer> = Vec::new();
@@ -117,7 +118,7 @@ pub async fn get_load_balancer_with_containers_by_image_id(
 /// 2. if not, rebuild it from the database record if it exists there
 /// 3. last case. create a new one. Save it locally and in db
 pub async fn get_or_init_load_balancer(
-    image_fk: i32,
+    image_fk: Arc<i32>,
     address: String,
     exposed_port: String,
     service_image: ServiceImage,
@@ -157,8 +158,7 @@ pub async fn get_or_init_load_balancer(
                     let mut awaited_lb_lock = awaited_lb_mutex.lock().await;
 
                     //the queue might be empty;
-                    let request_queue: Option<Vec<(Request, TcpStream, Uuid)>> =
-                        awaited_lb_lock.remove(&service_image.docker_image_id);
+                    let request_queue = awaited_lb_lock.remove(&service_image.docker_image_id);
                     if request_queue.is_some() {
                         lb.request_queue = request_queue.unwrap();
                     };

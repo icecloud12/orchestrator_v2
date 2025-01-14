@@ -1,4 +1,4 @@
-use std::{error::Error, str::FromStr};
+use std::{error::Error, ops::Deref, str::FromStr, sync::Arc};
 
 use custom_tcp_listener::models::{router::response_to_bytes, types::Request};
 use http::StatusCode;
@@ -16,7 +16,8 @@ use crate::{
     },
     models::{
         service_container_models::ServiceContainer, service_image_models::ServiceImage,
-        service_load_balancer::ServiceLoadBalancer, service_route_model::ServiceRoute,
+        service_load_balancer::ServiceLoadBalancer, service_request::ServiceRequest,
+        service_route_model::ServiceRoute,
     },
     utils::orchestrator_utils::{return_404, return_500, return_503, return_response},
 };
@@ -25,8 +26,11 @@ pub async fn route_to_service_handler(
     request: Request,
     tcp_stream: TcpStream,
 ) -> Result<(), Box<dyn Error>> {
+    tracing::info!("query route-image pair start");
     let resolved_service: Result<(Option<ServiceRoute>, Option<ServiceImage>), String> =
         route_resolver(request.path.clone()).await;
+
+    tracing::info!("query route-image pair finish");
     match resolved_service {
         Ok((service_route_option, service_image_option)) => {
             match (service_route_option, service_image_option) {
@@ -42,16 +46,22 @@ pub async fn route_to_service_handler(
                 }
                 (Some(service_route), Some(service_image)) => {
                     //CREATE THE REQUEST STRUCT HERE
-                    let service_request_uuid: Uuid = record_service_request_acceptance(
-                        request.path.clone(),
-                        request.method.clone(),
-                    );
                     let ServiceRoute {
                         image_fk,
                         prefix,
                         exposed_port,
                         ..
                     } = service_route;
+                    //maybe do some optimizations where Request from custom tcp listener having some fields initially be in Arc
+                    let request_path = Arc::new(request.path.clone());
+                    let request_method = Arc::new(request.method.clone());
+
+                    let service_request_uuid: Arc<Uuid> = record_service_request_acceptance(
+                        request_path,
+                        request_method,
+                        image_fk.clone(),
+                    );
+
                     //queue_ing logic for await_load_balancers
                     let awaited_lb_hm = AWAITED_LOADBALANCERS.get().unwrap();
                     let mut awaited_lb_lock = awaited_lb_hm.lock().await;
@@ -76,11 +86,14 @@ pub async fn route_to_service_handler(
                         let mut lb_hm = lb_mutex.lock().await;
                         let lb = lb_hm.get_mut(&lb_key).unwrap();
                         // println!("{:#?}", &lb);
+
                         match lb.mode {
                             ELoadBalancerMode::FORWARD => {
+                                tracing::info!("next_container check");
                                 let next_container_result = lb.next_container().await;
                                 match next_container_result {
                                     Ok((container_public_port, container_id)) => {
+                                        tracing::info!("next_container acquired");
                                         // println!("next-container-succes");
                                         let client_builder = reqwest::ClientBuilder::new();
                                         let client = client_builder
@@ -91,7 +104,7 @@ pub async fn route_to_service_handler(
                                             "http://localhost:{}{}",
                                             &container_public_port, request.path
                                         );
-
+                                        tracing::info!("forwarding to client");
                                         let send_request_result: Result<
                                             reqwest::Response,
                                             reqwest::Error,
@@ -105,11 +118,14 @@ pub async fn route_to_service_handler(
                                             .body(request.body)
                                             .send()
                                             .await;
+                                        tracing::info!("client responded");
                                         match send_request_result {
                                             Ok(response) => {
                                                 let response_status =
                                                     response.status().as_u16() as i32;
+                                                tracing::info!("returing to requestor");
                                                 return_response(response, tcp_stream).await;
+                                                tracing::info!("responded to requestor");
                                                 record_service_request_responded(
                                                     service_request_uuid,
                                                     &container_id,

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use tokio_postgres::types::Type;
 
 use crate::{
@@ -20,7 +22,7 @@ pub async fn route_resolver(
                     row.get::<&str, i32>(ServiceRouteColumns::IMAGE_FK.to_string().as_str());
                 let service_route = Some(ServiceRoute {
                     id: row.get::<&str, i32>("r_id"),
-                    image_fk: image_id.clone(),
+                    image_fk: Arc::new(image_id.clone()),
                     prefix: row
                         .get::<&str, String>(ServiceRouteColumns::PREFIX.to_string().as_str()),
                     exposed_port: row.get::<&str, String>(

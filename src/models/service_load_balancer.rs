@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use bollard::{container::ListContainersOptions, service::ContainerStateStatusEnum};
 use custom_tcp_listener::models::types::Request;
@@ -29,16 +29,16 @@ pub struct ServiceLoadBalancer {
     pub containers: Vec<ServiceContainer>, //docker_container_id_instances
     pub awaited_containers: HashMap<String, ServiceContainer>, //docker_containers not pushed to the active container vector
     pub validated: bool, //initially false to let the program know if the containers are checke,
-    pub request_queue: Vec<(Request, TcpStream, Uuid)>,
+    pub request_queue: Vec<(Request, TcpStream, Arc<Uuid>)>,
 }
 
 impl ServiceLoadBalancer {
 
-    pub async fn new(image_fk: i32, docker_image_id: String, exposed_port: String, address:String) -> Result<ServiceLoadBalancer, String>{
+    pub async fn new(image_fk: Arc<i32>, docker_image_id: String, exposed_port: String, address:String) -> Result<ServiceLoadBalancer, String>{
 
         let head: i32 = 0;
         let behavior: String = ELoadBalancerBehavior::RoundRobin.to_string();
-        let insert_result = POSTGRES_CLIENT.get().unwrap().query_typed("INSERT INTO load_balancers (image_fk, head, behavior) VALUES ($1, $2, $3) RETURNING id", &[(&image_fk, Type::INT4), 
+        let insert_result = POSTGRES_CLIENT.get().unwrap().query_typed("INSERT INTO load_balancers (image_fk, head, behavior) VALUES ($1, $2, $3) RETURNING id", &[(image_fk.as_ref(), Type::INT4), 
             (&head, Type::INT4), 
             (&behavior, Type::TEXT)]).await;
         match insert_result {
@@ -107,7 +107,7 @@ impl ServiceLoadBalancer {
             Err(err) => Err(err),
         }
     }
-    pub fn queue_request(&mut self, request: Request, tcp_stream: TcpStream, request_uuid: Uuid) {
+    pub fn queue_request(&mut self, request: Request, tcp_stream: TcpStream, request_uuid: Arc<Uuid>) {
         self.request_queue.push((request, tcp_stream, request_uuid));
     }
     pub fn add_container(&mut self, container: ServiceContainer) -> &ServiceContainer {
@@ -122,7 +122,7 @@ impl ServiceLoadBalancer {
         let awaited_containers = &mut self.awaited_containers;
         awaited_containers.insert(container.uuid.clone(), container);
     }
-    pub fn empty_queue(&mut self) -> Vec<(Request, TcpStream, Uuid)> {
+    pub fn empty_queue(&mut self) -> Vec<(Request, TcpStream, Arc<Uuid>)> {
         std::mem::take(&mut self.request_queue)
     }
     ///This function returns an Option of Vec<ServiceContainer> where

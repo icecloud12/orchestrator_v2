@@ -88,6 +88,7 @@ pub enum ServiceRequestColumns {
     METHOD,
     STATUS_CODE,
     ORCHESTRATOR_INSTANCE,
+    IMAGE_FK,
 }
 
 impl Display for ServiceRequestColumns {
@@ -102,6 +103,7 @@ impl Display for ServiceRequestColumns {
             Self::METHOD => write!(f, "method"),
             Self::STATUS_CODE => write!(f, "status_code"),
             Self::ORCHESTRATOR_INSTANCE => write!(f, "orchestrator_instance"),
+            Self::IMAGE_FK => write!(f, "image_fk"),
         }
     }
 }

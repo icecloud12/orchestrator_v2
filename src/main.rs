@@ -9,11 +9,10 @@ use custom_tcp_listener::models::router::Router;
 use dotenv::dotenv;
 use handlers::route_to_service_handler::{container_ready, route_to_service_handler};
 use std::env;
-use tokio::sync::mpsc::Receiver;
+use tracing_subscriber;
 use utils::orchestrator_utils::{ORCHESTRATOR_URI, ORCHESTRATOR_UUID};
 use utils::{docker_utils, postgres_utils};
 use uuid::Uuid;
-
 mod controllers;
 mod handlers;
 mod models;
@@ -22,13 +21,21 @@ mod utils;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
-    let mut database_uri = String::new();
-    let mut database_user = String::new();
-    let mut database_pass = String::new();
-    let mut database_name = String::new();
-    let mut listening_address = String::new();
-    let mut listening_port = String::new();
-    let mut _prefix = String::new();
+    let database_uri;
+    let database_user;
+    let database_pass;
+    let database_name;
+    let listening_address;
+    let listening_port;
+    let _prefix;
+    let subscriber = tracing_subscriber::fmt()
+        .compact()
+        .with_file(true)
+        .with_line_number(true)
+        .with_target(false)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+    tracing::info!("LOADING env variables");
     match (env::var("STATE"), env::var("PREFIX")) {
         (Ok(state), Ok(env_prefix)) if state.to_string() == "DEV" => {
             _prefix = env_prefix;
@@ -108,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ORCHESTRATOR_UUID.get_or_init(|| Uuid::new_v4());
     //there is no way shape or form this would miss
     // let mut rx: Receiver<SenderParameter> = request_channel_init();
-
+    tracing::info!("Loading orchestrator routes");
     let router = Router::new()
         .route(
             "/orchestrator/container/ready/:uuid:".to_string(),
@@ -123,6 +130,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/*".to_string(), post(route_to_service_handler))
         .route("/*".to_string(), put(route_to_service_handler))
         .route("/*".to_string(), trace(route_to_service_handler));
+    tracing::info!("now listening!");
     let _ = bind(
         router,
         format!("{}:{}", &listening_address, &listening_port).as_str(),
