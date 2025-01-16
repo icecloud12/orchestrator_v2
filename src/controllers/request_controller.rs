@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio_postgres::types::Type;
 use uuid::Uuid;
 
-use crate::utils::{postgres_utils::{ServiceRequestColumns, POSTGRES_CLIENT, TABLES}, orchestrator_utils::ORCHESTRATOR_UUID};
+use crate::utils::{postgres_utils::{ServiceRequestColumns, POSTGRES_CLIENT, TABLES}, orchestrator_utils::ORCHESTRATOR_INSTANCE_ID};
 
 pub fn record_service_request_acceptance(path: Arc<String>, method: Arc<String>, image_fk: Arc<i32>) -> Arc<Uuid>{
     let request_uuid = Arc::new(Uuid::new_v4());
@@ -20,14 +20,14 @@ pub fn record_service_request_acceptance(path: Arc<String>, method: Arc<String>,
                     uuid = ServiceRequestColumns::UUID.to_string(),
                     request_intercepted_timestamp= ServiceRequestColumns::REQUEST_TIME.to_string(), 
                     method = ServiceRequestColumns::METHOD.to_string(),
-                    orchestrator_instance = ServiceRequestColumns::ORCHESTRATOR_INSTANCE.to_string(),
+                    orchestrator_instance = ServiceRequestColumns::ORCHESTRATOR_INSTANCE_FK.to_string(),
                     image_fk = ServiceRequestColumns::IMAGE_FK.to_string())
                 .as_str(),
                 &[
                     (path.as_ref(), Type::TEXT), 
                     (uuid.as_ref(), Type::UUID), 
                     (method.as_ref(), Type::TEXT),
-                    (ORCHESTRATOR_UUID.get().unwrap(), Type::UUID),
+                    (ORCHESTRATOR_INSTANCE_ID.get().unwrap(), Type::INT4),
                     (image_fk.as_ref(), Type::INT4)
                     
                 

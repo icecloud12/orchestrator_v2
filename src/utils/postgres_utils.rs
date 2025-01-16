@@ -25,6 +25,8 @@ pub async fn connect(db_host: String, db_user: String, db_pass: String, db_name:
 pub enum TABLES {
     SERVICE_ROUTE,
     SERVICE_REQUEST,
+    ORCHESTRATORS,
+    ORCHESTRATOR_INSTANCE,
 }
 
 impl Display for TABLES {
@@ -32,6 +34,8 @@ impl Display for TABLES {
         match *self {
             Self::SERVICE_ROUTE => write!(f, "routes"),
             Self::SERVICE_REQUEST => write!(f, "requests"),
+            Self::ORCHESTRATORS => write!(f, "orchestrators"),
+            Self::ORCHESTRATOR_INSTANCE => write!(f, "orchestrator_instances"),
         }
     }
 }
@@ -87,7 +91,7 @@ pub enum ServiceRequestColumns {
     CONTAINER_FK,
     METHOD,
     STATUS_CODE,
-    ORCHESTRATOR_INSTANCE,
+    ORCHESTRATOR_INSTANCE_FK,
     IMAGE_FK,
 }
 
@@ -102,8 +106,37 @@ impl Display for ServiceRequestColumns {
             Self::CONTAINER_FK => write!(f, "container_fk"),
             Self::METHOD => write!(f, "method"),
             Self::STATUS_CODE => write!(f, "status_code"),
-            Self::ORCHESTRATOR_INSTANCE => write!(f, "orchestrator_instance"),
+            Self::ORCHESTRATOR_INSTANCE_FK => write!(f, "orchestrator_instance_fk"),
             Self::IMAGE_FK => write!(f, "image_fk"),
+        }
+    }
+}
+pub enum OrchestratorColumns {
+    ID,
+    NAME,
+    PUBLIC_UUID,
+}
+impl Display for OrchestratorColumns {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Self::ID => write!(f, "id"),
+            Self::NAME => write!(f, "name"),
+            Self::PUBLIC_UUID => write!(f, "public_uuid"),
+        }
+    }
+}
+pub enum OrchestratorInstanceColumns {
+    ID,
+    ORCHESTRATOR_FK,
+    UUID_INSTANCE,
+}
+
+impl Display for OrchestratorInstanceColumns {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Self::ID => write!(f, "id"),
+            Self::ORCHESTRATOR_FK => write!(f, "orchestrator_fk"),
+            Self::UUID_INSTANCE => write!(f, "uuid_instance"),
         }
     }
 }

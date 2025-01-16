@@ -1,4 +1,4 @@
-use std::{error::Error, ops::Deref, str::FromStr, sync::Arc};
+use std::{error::Error, str::FromStr, sync::Arc};
 
 use custom_tcp_listener::models::{router::response_to_bytes, types::Request};
 use http::StatusCode;
