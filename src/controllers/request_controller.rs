@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio_postgres::types::Type;
 use uuid::Uuid;
 
-use crate::utils::{postgres_utils::{ServiceRequestColumns, POSTGRES_CLIENT, TABLES}, orchestrator_utils::ORCHESTRATOR_INSTANCE_ID};
+use crate::{db::tables::TABLES, utils::{orchestrator_utils::ORCHESTRATOR_INSTANCE_ID, postgres_utils::{ServiceRequestColumns, POSTGRES_CLIENT}}};
 
 pub fn record_service_request_acceptance(path: Arc<String>, method: Arc<String>, image_fk: Arc<i32>) -> Arc<Uuid>{
     let request_uuid = Arc::new(Uuid::new_v4());

@@ -1,15 +1,13 @@
-use std::sync::OnceLock;
-
 use custom_tcp_listener::models::router::response_to_bytes;
 use http::StatusCode;
 use reqwest::Response;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
-use tokio_postgres::{types::Type, GenericClient};
+use tokio_postgres::types::Type;
 use uuid::Uuid;
 
-use super::postgres_utils::{
-    OrchestratorColumns, OrchestratorInstanceColumns, POSTGRES_CLIENT, TABLES,
-};
+use crate::db::tables::TABLES;
+
+use super::postgres_utils::{OrchestratorColumns, OrchestratorInstanceColumns, POSTGRES_CLIENT};
 
 pub static ORCHESTRATOR_URI: OnceLock<String> = OnceLock::new();
 pub static ORCHESTRATOR_PUBLIC_UUID: OnceLock<Uuid> = OnceLock::new();

@@ -16,8 +16,7 @@ use crate::{
     },
     models::{
         service_container_models::ServiceContainer, service_image_models::ServiceImage,
-        service_load_balancer::ServiceLoadBalancer, service_request::ServiceRequest,
-        service_route_model::ServiceRoute,
+        service_load_balancer::ServiceLoadBalancer, service_route_model::ServiceRoute,
     },
     utils::orchestrator_utils::{return_404, return_500, return_503, return_response},
 };

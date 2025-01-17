@@ -22,43 +22,6 @@ pub async fn connect(db_host: String, db_user: String, db_pass: String, db_name:
     POSTGRES_CLIENT.get_or_init(|| client);
 }
 //table enums
-pub enum TABLES {
-    SERVICE_ROUTE,
-    SERVICE_REQUEST,
-    ORCHESTRATORS,
-    ORCHESTRATOR_INSTANCE,
-}
-
-impl Display for TABLES {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {
-            Self::SERVICE_ROUTE => write!(f, "routes"),
-            Self::SERVICE_REQUEST => write!(f, "requests"),
-            Self::ORCHESTRATORS => write!(f, "orchestrators"),
-            Self::ORCHESTRATOR_INSTANCE => write!(f, "orchestrator_instances"),
-        }
-    }
-}
-
-pub enum ServiceRouteColumns {
-    ID,
-    IMAGE_FK,
-    PREFIX,
-    EXPOSED_PORT,
-    SEGMENTS,
-}
-
-impl Display for ServiceRouteColumns {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {
-            Self::ID => write!(f, "id"),
-            Self::IMAGE_FK => write!(f, "image_fk"),
-            Self::PREFIX => write!(f, "prefix"),
-            Self::EXPOSED_PORT => write!(f, "exposed_port"),
-            Self::SEGMENTS => write!(f, "segments"),
-        }
-    }
-}
 
 pub enum ServiceImageColumns {
     ID,

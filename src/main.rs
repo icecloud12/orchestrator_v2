@@ -1,5 +1,4 @@
 extern crate dotenv;
-
 use controllers::load_balancer_controller;
 use custom_tcp_listener::models::listener::bind;
 use custom_tcp_listener::models::route::{
@@ -14,6 +13,7 @@ use utils::orchestrator_utils::{create_instance, ORCHESTRATOR_PUBLIC_UUID, ORCHE
 use utils::{docker_utils, postgres_utils};
 use uuid::Uuid;
 mod controllers;
+mod db;
 mod handlers;
 mod models;
 mod utils;
