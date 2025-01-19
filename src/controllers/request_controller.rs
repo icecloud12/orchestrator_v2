@@ -3,13 +3,12 @@ use std::sync::Arc;
 use tokio_postgres::types::Type;
 use uuid::Uuid;
 
-use crate::{db::tables::TABLES, utils::{orchestrator_utils::ORCHESTRATOR_INSTANCE_ID, postgres_utils::{ServiceRequestColumns, POSTGRES_CLIENT}}};
+use crate::{db::{requests::ServiceRequestColumns, tables::TABLES}, utils::{orchestrator_utils::ORCHESTRATOR_INSTANCE_ID, postgres_utils::POSTGRES_CLIENT}};
 
 pub fn record_service_request_acceptance(path: Arc<String>, method: Arc<String>, image_fk: Arc<i32>) -> Arc<Uuid>{
     let request_uuid = Arc::new(Uuid::new_v4());
     let uuid_clone = request_uuid.clone();    //spawn a task here so the query insert does not "block" the task as it is considered a different task
     tokio::spawn(async move {
-        tracing::info!("accepted request db log");
         let client = POSTGRES_CLIENT.get().unwrap();
         let uuid = request_uuid.clone();
         let _query_result = client
@@ -33,9 +32,8 @@ pub fn record_service_request_acceptance(path: Arc<String>, method: Arc<String>,
                 
             ]).await;
         if let Err(err) = _query_result{
-            println!("Error in inserting request interception: {}", err.to_string())
+            tracing::warn!("Error in inserting request interception: {}", err.to_string());
         }
-        tracing::info!("accepted request db log end");
     });
     //create the query to send the request ehre to db
     uuid_clone
@@ -59,7 +57,7 @@ pub async fn record_service_request_responded(uuid: Arc<Uuid>, container_id: &i3
             (uuid.as_ref(), Type::UUID)
     ]).await;
     if let Err(err) = update_result {
-        println!("Error in updating request response: {}", err.to_string());
+        tracing::error!("Error in updating request response: {}", err.to_string());
     }
      
 }

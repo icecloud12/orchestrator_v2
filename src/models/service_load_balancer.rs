@@ -118,9 +118,9 @@ impl ServiceLoadBalancer {
     }
     pub async fn queue_container(&mut self, container: ServiceContainer) {
         let mut await_container_lock = AWAITED_CONTAINERS.get().unwrap().lock().await;
-        await_container_lock.insert(container.uuid.clone(), self.docker_image_id.clone());
+        await_container_lock.insert(container.uuid.as_simple().to_string(), self.docker_image_id.clone());
         let awaited_containers = &mut self.awaited_containers;
-        awaited_containers.insert(container.uuid.clone(), container);
+        awaited_containers.insert(container.uuid.as_simple().to_string(), container);
     }
     pub fn empty_queue(&mut self) -> Vec<(Request, TcpStream, Arc<Uuid>)> {
         std::mem::take(&mut self.request_queue)
@@ -163,9 +163,9 @@ impl ServiceLoadBalancer {
                         //await the containers before trying to start
                             let uuid = container.uuid.clone();
                             await_container_lock
-                                .insert(uuid.clone(), self.docker_image_id.clone());
+                                .insert(uuid.to_string(), self.docker_image_id.clone());
                             let awaited_containers = &mut self.awaited_containers;
-                            awaited_containers.insert(uuid, container);
+                            awaited_containers.insert(uuid.to_string(), container);
                             
                     };
                 }

@@ -25,18 +25,22 @@ pub async fn route_to_service_handler(
     request: Request,
     tcp_stream: TcpStream,
 ) -> Result<(), Box<dyn Error>> {
-    tracing::info!("query route-image pair start");
     let resolved_service: Result<(Option<ServiceRoute>, Option<ServiceImage>), String> =
         route_resolver(request.path.clone()).await;
-
-    tracing::info!("query route-image pair finish");
     match resolved_service {
         Ok((service_route_option, service_image_option)) => {
             match (service_route_option, service_image_option) {
                 (None, _) => {
                     return_404(tcp_stream).await;
                 }
-                (Some(_), None) => {
+                (Some(route), None) => {
+                    let route_id = &route.id;
+                    let route_path = &route.prefix;
+                    tracing::error!(
+                        "Invalid image reference for route-image pair for route :[{}]{}",
+                        route_id,
+                        route_path
+                    );
                     return_500(
                         tcp_stream,
                         "Orchestrator Error: System cannot find route-image pair".to_string(),
@@ -88,12 +92,9 @@ pub async fn route_to_service_handler(
 
                         match lb.mode {
                             ELoadBalancerMode::FORWARD => {
-                                tracing::info!("next_container check");
                                 let next_container_result = lb.next_container().await;
                                 match next_container_result {
                                     Ok((container_public_port, container_id)) => {
-                                        tracing::info!("next_container acquired");
-                                        // println!("next-container-succes");
                                         let client_builder = reqwest::ClientBuilder::new();
                                         let client = client_builder
                                             .danger_accept_invalid_certs(true)
@@ -103,7 +104,6 @@ pub async fn route_to_service_handler(
                                             "http://localhost:{}{}",
                                             &container_public_port, request.path
                                         );
-                                        tracing::info!("forwarding to client");
                                         let send_request_result: Result<
                                             reqwest::Response,
                                             reqwest::Error,
@@ -117,14 +117,12 @@ pub async fn route_to_service_handler(
                                             .body(request.body)
                                             .send()
                                             .await;
-                                        tracing::info!("client responded");
                                         match send_request_result {
                                             Ok(response) => {
                                                 let response_status =
                                                     response.status().as_u16() as i32;
-                                                tracing::info!("returing to requestor");
                                                 return_response(response, tcp_stream).await;
-                                                tracing::info!("responded to requestor");
+                                                tracing::info!("Responded to requestor");
                                                 record_service_request_responded(
                                                     service_request_uuid,
                                                     &container_id,
@@ -133,6 +131,7 @@ pub async fn route_to_service_handler(
                                                 .await;
                                             }
                                             Err(_) => {
+                                                tracing::error!("Something went wrong when trying to forward request to service");
                                                 //errors concerning the connection towards the address
                                                 return_503(tcp_stream).await;
                                                 record_service_request_responded(
@@ -147,10 +146,8 @@ pub async fn route_to_service_handler(
                                     Err(_) => {
                                         //cannot next as it is empty
                                         //create the container here
-                                        // println!("next-container-fail");
                                         match lb.create_container().await {
                                             Ok(new_container) => {
-                                                // println!("create-container-success");
                                                 //created  successfully
                                                 match new_container.start_container().await {
                                                     Ok(_) => {
@@ -175,7 +172,7 @@ pub async fn route_to_service_handler(
                                                 }
                                             }
                                             Err(docker_create_error) => {
-                                                println!("create-container-fail");
+                                                tracing::error!("Docker error: Failure to create container [docker_image_id: {}]", &lb.docker_image_id);
                                                 return_500(tcp_stream, docker_create_error).await;
                                                 record_service_request_responded(
                                                     service_request_uuid, //formatting why do you do this man
@@ -194,7 +191,10 @@ pub async fn route_to_service_handler(
                                         Ok(new_container) => {
                                             match new_container.start_container().await {
                                                 Ok(_container_start_success) => {
-                                                    println!("queueing container");
+                                                    tracing::info!(
+                                                        "Queueing container:{}",
+                                                        &new_container.id
+                                                    );
                                                     lb.queue_request(
                                                         request,
                                                         tcp_stream,
@@ -228,7 +228,6 @@ pub async fn route_to_service_handler(
                                     }
                                 } else {
                                     lb.queue_request(request, tcp_stream, service_request_uuid);
-                                    println!("stucj queing here");
                                 }
                             }
                         };
@@ -257,8 +256,6 @@ pub async fn container_ready(
     let uuid = params.get("uuid").unwrap();
     let awaited_container_mutex = AWAITED_CONTAINERS.get().unwrap();
     let mut awaited_containers = awaited_container_mutex.lock().await;
-    println!("awaited containers{:#?}", &awaited_containers);
-    println!("uuid: {}", &uuid);
     let load_balancer_key_option = awaited_containers.remove(uuid);
     drop(awaited_containers);
     if let Some(load_balancer_key) = load_balancer_key_option {
@@ -292,8 +289,6 @@ pub async fn container_ready(
             ELoadBalancerMode::QUEUE => {
                 service_load_balancer.mode = ELoadBalancerMode::FORWARD;
                 let queue = service_load_balancer.empty_queue();
-
-                println!("request_queue : {:#?}", &queue);
                 for (request, tcp_stream, service_request_uuid) in queue.into_iter() {
                     //foward all queued stream to the newly made container
                     //todo NEED TO STORE THE REQUEST INFO AS WELL
@@ -303,7 +298,6 @@ pub async fn container_ready(
                         .build()
                         .unwrap();
                     let url = format!("http://localhost:{}{}", &container_port, request.path);
-                    println!("url:{}", &url);
                     let send_request_result = client
                         .request(
                             reqwest::Method::from_str(request.method.as_str()).unwrap(),

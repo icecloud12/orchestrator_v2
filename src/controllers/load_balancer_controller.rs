@@ -72,7 +72,6 @@ pub async fn get_load_balancer_with_containers_by_image_id(
             let mut containers: Vec<ServiceContainer> = Vec::new();
             let mut id: Option<i32> = None;
             let mut head: Option<i32> = None;
-            println!("{}", &image_fk);
             if !rows.is_empty() {
                 for row in rows.into_iter() {
                     if id.is_none() {
@@ -84,7 +83,7 @@ pub async fn get_load_balancer_with_containers_by_image_id(
                             id: c_id,
                             container_id: row.get::<&str, String>("docker_container_id"),
                             public_port: row.get::<&str, i32>("public_port"),
-                            uuid: row.get::<&str, String>("uuid"),
+                            uuid: row.get::<&str, Uuid>("uuid"),
                         });
                     }
                 }
@@ -169,10 +168,6 @@ pub async fn get_or_init_load_balancer(
 
                     let mut container_len = lb.containers.len();
                     let mut awaited_container_len = lb.awaited_containers.len();
-                    println!(
-                        "pre-validation: {} {}",
-                        &container_len, &awaited_container_len
-                    );
                     let mut new_lb: bool = container_len + awaited_container_len == 0;
                     let new_lb_check: Result<Option<Vec<i32>>, String> = if !new_lb {
                         let pruned_containers: Result<Option<Vec<i32>>, String> =
@@ -181,22 +176,17 @@ pub async fn get_or_init_load_balancer(
                             Ok(option_vec_container_id) => {
                                 container_len = lb.containers.len();
                                 awaited_container_len = lb.awaited_containers.len();
-                                println!(
-                                    "post-validation: {} {}",
-                                    &container_len, &awaited_container_len
-                                );
                                 if container_len > 0 {
                                     lb.mode = ELoadBalancerMode::FORWARD;
                                     Ok(option_vec_container_id)
                                 } else if awaited_container_len > 0 {
-                                    println!("having awaited containers");
                                     let awaited_containers = &lb.awaited_containers;
                                     let any_entry = awaited_containers.iter().next().unwrap();
 
                                     let mut awaited_container_lock =
                                         AWAITED_CONTAINERS.get().unwrap().lock().await;
                                     awaited_container_lock.insert(
-                                        any_entry.1.uuid.clone(),
+                                        any_entry.1.uuid.to_string(),
                                         lb.docker_image_id.clone(),
                                     );
                                     let start_container_result =
@@ -208,8 +198,8 @@ pub async fn get_or_init_load_balancer(
                                         }
                                         Err(err) => {
                                             //remove the entry from the hashmap
-                                            let _remove_option =
-                                                awaited_container_lock.remove(&any_entry.1.uuid);
+                                            let _remove_option = awaited_container_lock
+                                                .remove(&any_entry.1.uuid.to_string());
                                             drop(awaited_container_lock);
                                             Err(err.to_string())
                                         }

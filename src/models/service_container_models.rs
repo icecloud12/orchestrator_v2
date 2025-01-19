@@ -1,18 +1,19 @@
 use crate::utils::docker_utils::DOCKER;
 use bollard::container::StartContainerOptions;
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub struct ServiceContainer {
     pub id: i32,
     pub container_id: String, // docker internal id of the docker container
     pub public_port: i32,     //
-    pub uuid: String,
+    pub uuid: Uuid,
 }
 #[derive(Debug)]
 pub struct ServiceContainerBody {
     pub container_id: String, // docker internal id of the docker container
     pub public_port: usize,   //
-    pub uuid: String,
+    pub uuid: Uuid,
 }
 
 pub type DockerImageId = String;

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    db::route::{route_resolution_query, ServiceRouteColumns},
+    db::routes::{route_resolution_query, ServiceRouteColumns},
     models::{service_image_models::ServiceImage, service_route_model::ServiceRoute},
 };
 

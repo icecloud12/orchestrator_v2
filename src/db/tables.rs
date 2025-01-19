@@ -5,6 +5,7 @@ pub enum TABLES {
     SERVICE_REQUEST,
     ORCHESTRATORS,
     ORCHESTRATOR_INSTANCE,
+    SERVICE_CONTAINER,
 }
 
 impl Display for TABLES {
@@ -14,6 +15,7 @@ impl Display for TABLES {
             Self::SERVICE_REQUEST => write!(f, "requests"),
             Self::ORCHESTRATORS => write!(f, "orchestrators"),
             Self::ORCHESTRATOR_INSTANCE => write!(f, "orchestrator_instances"),
+            Self::SERVICE_CONTAINER => write!(f, "containers"),
         }
     }
 }

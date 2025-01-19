@@ -9,6 +9,7 @@ use tokio_postgres::types::Type;
 use uuid::Uuid;
 
 use crate::{
+    db::containers::container_insert_query,
     models::service_container_models::ServiceContainer,
     utils::{
         docker_utils::DOCKER, orchestrator_utils::ORCHESTRATOR_URI, postgres_utils::POSTGRES_CLIENT,
@@ -51,12 +52,12 @@ pub async fn create_container(
         port_bindings: Some(port_binding),
         ..Default::default()
     };
-    let uuid = Uuid::new_v4().simple().to_string();
+    let uuid = Uuid::new_v4();
     let config = Config {
         image: Some(docker_image_id.to_owned()),
         host_config: Some(host_config),
         env: Some(vec![
-            format!("uuid={}", uuid.clone()),
+            format!("uuid={}", uuid.as_simple().to_string()),
             format!(
                 "orchestrator_uri={}",
                 ORCHESTRATOR_URI.get().unwrap().as_str()
@@ -68,13 +69,9 @@ pub async fn create_container(
     match create_container_result {
         Ok(res) => {
             //insert into db the container
-            let container_insert_result= POSTGRES_CLIENT.get().unwrap().query_typed
-				("INSERT INTO containers (docker_container_id, public_port, uuid) VALUES ($1, $2, $3) RETURNING id;",
-				&[
-					(&res.id, Type::TEXT),
-					(&local_port, Type::INT4),
-					(&uuid, Type::TEXT)
-				]).await;
+            let container_id = &res.id;
+            let container_insert_result =
+                container_insert_query(&container_id, &local_port, &uuid).await;
             match container_insert_result {
                 Ok(rows) => {
                     //we are only expect 1 result

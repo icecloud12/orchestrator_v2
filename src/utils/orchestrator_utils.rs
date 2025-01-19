@@ -1,13 +1,17 @@
 use custom_tcp_listener::models::router::response_to_bytes;
 use http::StatusCode;
 use reqwest::Response;
+use std::sync::OnceLock;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 use tokio_postgres::types::Type;
 use uuid::Uuid;
 
+use super::postgres_utils::POSTGRES_CLIENT;
+use crate::db::orchestrator_instances::{
+    create_orchestrator_instance_query, OrchestratorInstanceColumns,
+};
+use crate::db::orchestrators::OrchestratorColumns;
 use crate::db::tables::TABLES;
-
-use super::postgres_utils::{OrchestratorColumns, OrchestratorInstanceColumns, POSTGRES_CLIENT};
 
 pub static ORCHESTRATOR_URI: OnceLock<String> = OnceLock::new();
 pub static ORCHESTRATOR_PUBLIC_UUID: OnceLock<Uuid> = OnceLock::new();
@@ -74,23 +78,7 @@ pub async fn return_response(response: Response, mut tcp_stream: TcpStream) {
 }
 
 pub async fn create_instance() -> bool {
-    let client = POSTGRES_CLIENT.get().unwrap();
-    let insert_result = client
-        .query_typed(
-            format!(
-                "INSERT INTO {orchestrator_instance_table_name} ({col_orchestrator_fk}) VALUES ((SELECT {orchestrator_id} from {orchestrator_table} where {public_uuid} = $1)) RETURNING {orchestrator_instance_id}",
-                orchestrator_instance_table_name = TABLES::ORCHESTRATOR_INSTANCE.to_string(),
-                col_orchestrator_fk = OrchestratorInstanceColumns::ORCHESTRATOR_FK.to_string(),
-                orchestrator_id = OrchestratorColumns::ID.to_string(),
-                orchestrator_table = TABLES::ORCHESTRATORS.to_string(),
-                public_uuid = OrchestratorColumns::PUBLIC_UUID.to_string(),
-                orchestrator_instance_id = OrchestratorInstanceColumns::ID.to_string()
-            )
-            .as_str(),
-            &[
-                (ORCHESTRATOR_PUBLIC_UUID.get().unwrap(), Type::UUID)
-            ],
-    ).await;
+    let insert_result = create_orchestrator_instance_query().await;
     match insert_result {
         Ok(rows) => {
             //we assert there is only 1 result
