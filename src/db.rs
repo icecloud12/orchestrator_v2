@@ -1,7 +1,10 @@
+pub mod container_instance_port_pool_junction;
+pub mod container_instances;
 pub mod containers;
 pub mod images;
 pub mod orchestrator_instances;
 pub mod orchestrators;
+pub mod port_pool;
 pub mod requests;
 pub mod routes;
 pub mod tables;

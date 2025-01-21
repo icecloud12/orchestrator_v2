@@ -6,6 +6,8 @@ pub enum TABLES {
     ORCHESTRATORS,
     ORCHESTRATOR_INSTANCE,
     SERVICE_CONTAINER,
+    PORT_POOL,
+    CONTAINER_INSTANCE_PORT_POOL_JUNCTION,
 }
 
 impl Display for TABLES {
@@ -16,6 +18,10 @@ impl Display for TABLES {
             Self::ORCHESTRATORS => write!(f, "orchestrators"),
             Self::ORCHESTRATOR_INSTANCE => write!(f, "orchestrator_instances"),
             Self::SERVICE_CONTAINER => write!(f, "containers"),
+            Self::PORT_POOL => write!(f, "port_pool"),
+            Self::CONTAINER_INSTANCE_PORT_POOL_JUNCTION => {
+                write!(f, "container_instance_port_pool_junction")
+            }
         }
     }
 }
