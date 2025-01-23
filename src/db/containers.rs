@@ -9,12 +9,28 @@ use super::tables::TABLES;
 pub enum ServiceContainerColumns {
     ID,
     DOCKER_CONTAINER_ID,
+    CONTAINER_INSTANCE_PORT_POOL_JUNCTION_FK,
 }
 impl Display for ServiceContainerColumns {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
             Self::ID => write!(f, "id"),
             Self::DOCKER_CONTAINER_ID => write!(f, "docker_container_id"),
+            Self::CONTAINER_INSTANCE_PORT_POOL_JUNCTION_FK => {
+                write!(f, "container_instance_port_pool_junction_fk")
+            }
+        }
+    }
+}
+
+impl ServiceContainerColumns {
+    pub fn as_str(&self) -> &str {
+        match *self {
+            Self::ID => "id",
+            Self::DOCKER_CONTAINER_ID => "docker_container_id",
+            Self::CONTAINER_INSTANCE_PORT_POOL_JUNCTION_FK => {
+                "container_instance_port_pool_junction_fk"
+            }
         }
     }
 }
