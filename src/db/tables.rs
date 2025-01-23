@@ -25,3 +25,17 @@ impl Display for TABLES {
         }
     }
 }
+
+impl TABLES {
+    pub fn as_str(&self) -> &str {
+        match *self {
+            Self::SERVICE_ROUTE => "routes",
+            Self::SERVICE_REQUEST => "requests",
+            Self::ORCHESTRATORS => "orchestrators",
+            Self::ORCHESTRATOR_INSTANCE => "orchestrator_instances",
+            Self::SERVICE_CONTAINER => "containers",
+            Self::PORT_POOL => "port_pool",
+            Self::CONTAINER_INSTANCE_PORT_POOL_JUNCTION => "container_instance_port_pool_junction",
+        }
+    }
+}
