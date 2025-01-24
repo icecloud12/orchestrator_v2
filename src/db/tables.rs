@@ -1,13 +1,15 @@
 use std::fmt::Display;
 
 pub enum TABLES {
-    SERVICE_ROUTE,
-    SERVICE_REQUEST,
+    CONTAINER_INSTANCE_PORT_POOL_JUNCTION,
+    LOAD_BALANCER_CONTAINER_JUNCTION,
     ORCHESTRATORS,
     ORCHESTRATOR_INSTANCE,
-    SERVICE_CONTAINER,
+    SERVICE_ROUTE,
     PORT_POOL,
-    CONTAINER_INSTANCE_PORT_POOL_JUNCTION,
+    SERVICE_CONTAINER,
+    SERVICE_LOADBALANCERS,
+    SERVICE_REQUEST,
 }
 
 impl Display for TABLES {
@@ -22,6 +24,8 @@ impl Display for TABLES {
             Self::CONTAINER_INSTANCE_PORT_POOL_JUNCTION => {
                 write!(f, "container_instance_port_pool_junction")
             }
+            Self::SERVICE_LOADBALANCERS => write!(f, "load_balancers"),
+            Self::LOAD_BALANCER_CONTAINER_JUNCTION => write!(f, "load_balancer_container_junction"),
         }
     }
 }
@@ -36,6 +40,8 @@ impl TABLES {
             Self::SERVICE_CONTAINER => "containers",
             Self::PORT_POOL => "port_pool",
             Self::CONTAINER_INSTANCE_PORT_POOL_JUNCTION => "container_instance_port_pool_junction",
+            Self::SERVICE_LOADBALANCERS => "load_balancers",
+            Self::LOAD_BALANCER_CONTAINER_JUNCTION => "load_balancer_container_junction",
         }
     }
 }

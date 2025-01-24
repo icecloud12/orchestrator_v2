@@ -1,6 +1,8 @@
 pub mod container_instance_port_pool_junction;
 pub mod containers;
 pub mod images;
+pub mod load_balancer_container_junctions;
+pub mod load_balancers;
 pub mod orchestrator_instances;
 pub mod orchestrators;
 pub mod port_pool;

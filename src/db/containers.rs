@@ -1,4 +1,4 @@
-use std::{fmt::Display, sync::Arc};
+use std::fmt::Display;
 use tokio_postgres::{types::Type, Error, Row};
 use uuid::Uuid;
 
@@ -40,50 +40,23 @@ impl ServiceContainerColumns {
         }
     }
 }
-/// A function call to prepare a port and Uuid for container creation
-pub async fn prepare_port_allocation() -> Result<(i32, Arc<Uuid>), Error> {
-    //allocate a port if available
-    let allocate_result = allocate_port().await;
-    match allocate_result {
-        Ok(rows) => {
-            let row = &rows[0];
-            let port_pool_fk = row
-                .get::<&str, i32>(ContainerInstancePortPoolJunctionColumns::PORT_POOL_FK.as_str());
-            let generated_uuid =
-                row.get::<&str, Uuid>(ContainerInstancePortPoolJunctionColumns::UUID.as_str());
-            //give then port_pool_fk we can query it back.
-            let port_pool_query_result = get_port_pool(&port_pool_fk).await;
-            match port_pool_query_result {
-                Ok(rows) => {
-                    //expecting 1  row only
-                    let row = &rows[0];
-                    let allocated_port: i32 = row.get::<&str, i32>(PortPoolColumns::PORT.as_str());
-                    return Ok((allocated_port, Arc::new(generated_uuid)));
-                }
-                Err(err) => return Err(err),
-            }
-        }
-        Err(err) => return Err(err),
-    };
-}
-// pub async fn container_insert_query(
-//     docker_container_id: &String,
-//     container_public_port: &i32,
-//     container_uuid: &Uuid,
-// ) -> Result<Vec<Row>, Error> {
-//     let client = POSTGRES_CLIENT.get().unwrap();
 
-//     client.query_typed
-// 				(format!(
-// 				    "INSERT INTO {container_table} ({docker_container_id_column}, {public_port_column}, {uuid_column}) VALUES ($1, $2, $3) RETURNING id;",
-// 				    container_table = TABLES::SERVICE_CONTAINER.to_string(),
-// 				    docker_container_id_column = ServiceContainerColumns::DOCKER_CONTAINER_ID.to_string(),
-// 				    public_port_column = ServiceContainerColumns::PUBLIC_PORT.to_string(),
-// 				    uuid_column = ServiceContainerColumns::UUID.to_string()
-// 				).as_str(),
-// 				&[
-// 					(&docker_container_id, Type::TEXT),
-// 					(&container_public_port, Type::INT4),
-// 					(&container_uuid, Type::UUID)
-// 				]).await
-// }
+pub async fn container_insert_query(
+    docker_container_id: &String,
+    cippk_id: &i32,
+) -> Result<Vec<Row>, Error> {
+    let client = POSTGRES_CLIENT.get().unwrap();
+    let insert_result = client
+        .query_typed(
+            format!(
+                "INSERT INTO {containers_table}
+                VALUES ($1, $2)
+            ",
+                containers_table = TABLES::SERVICE_CONTAINER.as_str(),
+            )
+            .as_str(),
+            &[(docker_container_id, Type::TEXT), (cippk_id, Type::INT4)],
+        )
+        .await;
+    insert_result
+}
