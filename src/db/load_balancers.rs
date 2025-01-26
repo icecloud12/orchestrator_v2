@@ -1,11 +1,8 @@
 use std::fmt::Display;
 
-use tokio_postgres::{Error, Row};
-use tracing::Instrument;
+use tokio_postgres::{types::Type, Error, Row};
 
-use crate::{
-    models::service_load_balancer::ServiceLoadBalancer, utils::postgres_utils::POSTGRES_CLIENT,
-};
+use crate::utils::postgres_utils::POSTGRES_CLIENT;
 
 use super::{
     container_instance_port_pool_junction::ContainerInstancePortPoolJunctionColumns,
@@ -64,6 +61,10 @@ pub async fn get_existing_load_balancer_by_image(image_fk: &i32) -> Result<Vec<R
                 {c_table} c ON lbcj.{lbcj_cfk} = c.{c_id}
             LEFT JOIN
                 {cippj_table} cippj ON c.{c_cippjfk} = cippj.{cippj_id}
+            LEFT JOIN
+                {pp_table} pp ON cippj.{cippj_ppfk} = pp.{pp_id}
+            WHERE
+                lb.{lb_image_fk} = $1
         ",
                 lb_id = ServiceLoadBalancersColumns::ID.as_str(),
                 lb_head = ServiceLoadBalancersColumns::HEAD.as_str(),
@@ -79,10 +80,14 @@ pub async fn get_existing_load_balancer_by_image(image_fk: &i32) -> Result<Vec<R
                 cippj_table = TABLES::CONTAINER_INSTANCE_PORT_POOL_JUNCTION.as_str(),
                 c_cippjfk =
                     ServiceContainerColumns::CONTAINER_INSTANCE_PORT_POOL_JUNCTION_FK.as_str(),
-                cippj_id = ContainerInstancePortPoolJunctionColumns::ID.as_str()
+                cippj_id = ContainerInstancePortPoolJunctionColumns::ID.as_str(),
+                pp_table = TABLES::PORT_POOL.as_str(),
+                cippj_ppfk = ContainerInstancePortPoolJunctionColumns::PORT_POOL_FK.as_str(),
+                pp_id = PortPoolColumns::ID.as_str(),
+                lb_image_fk = ServiceLoadBalancersColumns::IMAGE_FK.as_str()
             )
             .as_str(),
-            &[],
+            &[(image_fk, Type::INT4)],
         )
         .await
 }
