@@ -88,8 +88,7 @@ pub async fn route_to_service_handler(
                         let lb_mutex = LOADBALANCERS.get().unwrap();
                         let mut lb_hm = lb_mutex.lock().await;
                         let lb = lb_hm.get_mut(&lb_key).unwrap();
-                        // println!("{:#?}", &lb);
-
+                        println!("{:#?}", lb);
                         match lb.mode {
                             ELoadBalancerMode::FORWARD => {
                                 let next_container_result = lb.next_container().await;
@@ -254,8 +253,10 @@ pub async fn container_ready(
 ) -> Result<(), Box<dyn Error>> {
     let params = request.parameters;
     let uuid = params.get("uuid").unwrap();
+    tracing::info!("recieved container uuid: {}", uuid);
     let awaited_container_mutex = AWAITED_CONTAINERS.get().unwrap();
     let mut awaited_containers = awaited_container_mutex.lock().await;
+    println!("awaited containers {:#?}", awaited_containers);
     let load_balancer_key_option = awaited_containers.remove(uuid);
     drop(awaited_containers);
     if let Some(load_balancer_key) = load_balancer_key_option {

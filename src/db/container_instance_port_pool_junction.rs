@@ -5,7 +5,7 @@ use super::{
 };
 use crate::utils::{orchestrator_utils::ORCHESTRATOR_PUBLIC_UUID, postgres_utils::POSTGRES_CLIENT};
 use std::{fmt::Display, sync::Arc};
-use tokio_postgres::{Error, Row};
+use tokio_postgres::{types::Type, Error, Row};
 use uuid::Uuid;
 
 pub enum ContainerInstancePortPoolJunctionColumns {
@@ -38,28 +38,42 @@ impl ContainerInstancePortPoolJunctionColumns {
 
 pub async fn allocate_port() -> Result<Vec<Row>, Error> {
     let client = POSTGRES_CLIENT.get().unwrap();
-    let insert_result = client.query_typed(format!(
-        "INSERT INTO {cippj} ({cippj_ppfk}, {cippj_in_use}) values (
-            (SELECT pp.{pp_id} from {pp} as pp,
+    let insert_result = client
+        .query_typed(
+            format!(
+                "
+        INSERT INTO {cippj} ({cippj_ppfk}, {cippj_in_use}) values (
+            (SELECT pp.{pp_id}
+            FROM {pp} pp
             LEFT JOIN {o_table} on pp.{pp_o_fk} = {o_table}.{o_table_id}
             WHERE
-                {o_table}.{o_table_pub_uuid} = {pub_uuid} AND
-                NOT EXISTS (SELECT 1 FROM {cippj} cippj where pp.{pp_id} = cippj.{cippj_ppfk} AND cippj.{cippj_in_use} LIMIT 1 FOR UPDATE)
+                {o_table}.{o_table_pub_uuid} = $1
+                AND
+                NOT EXISTS(
+                    SELECT 1 FROM {cippj} cippj
+                    WHERE pp.{pp_id} = cippj.{cippj_ppfk}
+                    AND
+                    cippj.{cippj_in_use}
+                    LIMIT 1 FOR UPDATE
+                )
             LIMIT 1 FOR UPDATE),
             TRUE)
         RETURNING *
-        )",
-         cippj = TABLES::CONTAINER_INSTANCE_PORT_POOL_JUNCTION.as_str(),
-         cippj_ppfk =  ContainerInstancePortPoolJunctionColumns::PORT_POOL_FK.as_str(),
-         cippj_in_use = ContainerInstancePortPoolJunctionColumns::IN_USE.as_str(),
-         pp = TABLES::PORT_POOL.as_str(),
-         pp_id = PortPoolColumns::ID.as_str(),
-         pp_o_fk = PortPoolColumns::ORCHESTRATOR_FK.as_str(),
-         o_table = TABLES::ORCHESTRATORS.as_str(),
-         o_table_id = OrchestratorColumns::ID.as_str(),
-         o_table_pub_uuid = OrchestratorColumns::PUBLIC_UUID.as_str(),
-         pub_uuid = ORCHESTRATOR_PUBLIC_UUID.get().unwrap()
-     ).as_str(), &[]).await;
+    ",
+                cippj = TABLES::CONTAINER_INSTANCE_PORT_POOL_JUNCTION.as_str(),
+                cippj_ppfk = ContainerInstancePortPoolJunctionColumns::PORT_POOL_FK.as_str(),
+                cippj_in_use = ContainerInstancePortPoolJunctionColumns::IN_USE.as_str(),
+                pp = TABLES::PORT_POOL.as_str(),
+                pp_id = PortPoolColumns::ID.as_str(),
+                pp_o_fk = PortPoolColumns::ORCHESTRATOR_FK.as_str(),
+                o_table = TABLES::ORCHESTRATORS.as_str(),
+                o_table_id = OrchestratorColumns::ID.as_str(),
+                o_table_pub_uuid = OrchestratorColumns::PUBLIC_UUID.as_str(),
+            )
+            .as_str(),
+            &[(ORCHESTRATOR_PUBLIC_UUID.get().unwrap(), Type::UUID)],
+        )
+        .await;
     insert_result
 }
 
@@ -74,19 +88,26 @@ pub async fn prepare_port_allocation() -> Result<(i32, Arc<i32>, Uuid), Error> {
                 .get::<&str, i32>(ContainerInstancePortPoolJunctionColumns::PORT_POOL_FK.as_str());
             let generated_uuid =
                 row.get::<&str, Uuid>(ContainerInstancePortPoolJunctionColumns::UUID.as_str());
+            let cippj_id =
+                row.get::<&str, i32>(ContainerInstancePortPoolJunctionColumns::ID.as_str());
             //give then port_pool_fk we can query it back.
             let port_pool_query_result = get_port_pool(&port_pool_fk).await;
             match port_pool_query_result {
                 Ok(rows) => {
                     //expecting 1  row only
                     let row = &rows[0];
-                    let allocated_port: i32 = row.get::<&str, i32>(PortPoolColumns::PORT.as_str());
-                    let cippj_id: i32 = row.get::<&str, i32>(PortPoolColumns::ID.as_str());
+                    let allocated_port: i32 = row.get::<&str, i32>("pp_port");
                     return Ok((cippj_id, Arc::new(allocated_port), generated_uuid));
                 }
-                Err(err) => return Err(err),
+                Err(err) => {
+                    tracing::error!("get_port_pool error {}", err);
+                    return Err(err);
+                }
             }
         }
-        Err(err) => return Err(err),
+        Err(err) => {
+            tracing::error!("Failed to allocate port:  {}", err);
+            return Err(err);
+        }
     };
 }

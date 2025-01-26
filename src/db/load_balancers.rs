@@ -52,7 +52,7 @@ pub async fn get_existing_load_balancer_by_image(image_fk: &i32) -> Result<Vec<R
                 c.{c_id} as c_id,
                 c.{c_docker_container_id},
                 pp.{pp_port},
-                cippj.{cippj_uuid},
+                cippj.{cippj_uuid}
             FROM
                 {lb_table} lb
             LEFT JOIN
@@ -64,27 +64,28 @@ pub async fn get_existing_load_balancer_by_image(image_fk: &i32) -> Result<Vec<R
             LEFT JOIN
                 {pp_table} pp ON cippj.{cippj_ppfk} = pp.{pp_id}
             WHERE
-                lb.{lb_image_fk} = $1
+                lb.{lb_image_fk} = $1 AND
+                cippj.{cippj_inuse} = true
         ",
-                lb_id = ServiceLoadBalancersColumns::ID.as_str(),
-                lb_head = ServiceLoadBalancersColumns::HEAD.as_str(),
-                c_id = ServiceContainerColumns::ID.as_str(),
-                c_docker_container_id = ServiceContainerColumns::DOCKER_CONTAINER_ID.as_str(),
-                pp_port = PortPoolColumns::PORT.as_str(),
-                cippj_uuid = ContainerInstancePortPoolJunctionColumns::UUID.as_str(),
-                lb_table = TABLES::SERVICE_LOADBALANCERS.as_str(),
-                lbcj_table = TABLES::LOAD_BALANCER_CONTAINER_JUNCTION.as_str(),
-                lbcj_lbfk = LoadBalancerContainerJunctionColumns::LOAD_BALANCER_FK.as_str(),
-                c_table = TABLES::SERVICE_CONTAINER.as_str(),
-                lbcj_cfk = LoadBalancerContainerJunctionColumns::CONTAINER_FK.as_str(),
-                cippj_table = TABLES::CONTAINER_INSTANCE_PORT_POOL_JUNCTION.as_str(),
-                c_cippjfk =
-                    ServiceContainerColumns::CONTAINER_INSTANCE_PORT_POOL_JUNCTION_FK.as_str(),
-                cippj_id = ContainerInstancePortPoolJunctionColumns::ID.as_str(),
-                pp_table = TABLES::PORT_POOL.as_str(),
-                cippj_ppfk = ContainerInstancePortPoolJunctionColumns::PORT_POOL_FK.as_str(),
-                pp_id = PortPoolColumns::ID.as_str(),
-                lb_image_fk = ServiceLoadBalancersColumns::IMAGE_FK.as_str()
+                lb_id = ServiceLoadBalancersColumns::ID,
+                lb_head = ServiceLoadBalancersColumns::HEAD,
+                c_id = ServiceContainerColumns::ID,
+                c_docker_container_id = ServiceContainerColumns::DOCKER_CONTAINER_ID,
+                pp_port = PortPoolColumns::PORT,
+                cippj_uuid = ContainerInstancePortPoolJunctionColumns::UUID,
+                lb_table = TABLES::SERVICE_LOADBALANCERS,
+                lbcj_table = TABLES::LOAD_BALANCER_CONTAINER_JUNCTION,
+                lbcj_lbfk = LoadBalancerContainerJunctionColumns::LOAD_BALANCER_FK,
+                c_table = TABLES::SERVICE_CONTAINER,
+                lbcj_cfk = LoadBalancerContainerJunctionColumns::CONTAINER_FK,
+                cippj_table = TABLES::CONTAINER_INSTANCE_PORT_POOL_JUNCTION,
+                c_cippjfk = ServiceContainerColumns::CONTAINER_INSTANCE_PORT_POOL_JUNCTION_FK,
+                cippj_id = ContainerInstancePortPoolJunctionColumns::ID,
+                pp_table = TABLES::PORT_POOL,
+                cippj_ppfk = ContainerInstancePortPoolJunctionColumns::PORT_POOL_FK,
+                pp_id = PortPoolColumns::ID,
+                lb_image_fk = ServiceLoadBalancersColumns::IMAGE_FK,
+                cippj_inuse = ContainerInstancePortPoolJunctionColumns::IN_USE,
             )
             .as_str(),
             &[(image_fk, Type::INT4)],

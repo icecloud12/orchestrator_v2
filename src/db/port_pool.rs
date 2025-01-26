@@ -4,7 +4,9 @@ use tokio_postgres::{types::Type, Error, GenericClient, Row};
 
 use crate::utils::postgres_utils::POSTGRES_CLIENT;
 
-use super::tables::TABLES;
+use super::{
+    container_instance_port_pool_junction::ContainerInstancePortPoolJunctionColumns, tables::TABLES,
+};
 
 pub enum PortPoolColumns {
     ID,
@@ -31,22 +33,28 @@ impl PortPoolColumns {
         }
     }
 }
-pub async fn get_port_pool(pp_id: &i32) -> Result<Vec<Row>, Error> {
+pub async fn get_port_pool(ppp_id: &i32) -> Result<Vec<Row>, Error> {
     let client = POSTGRES_CLIENT.get().unwrap();
     let select_result = client
         .query_typed(
             format!(
                 "
-        SELECT {p} FROM {pp} pp
+        SELECT pp.{pp_port} as pp_port, cippj.{cippj_id} as cippj_id
+        FROM {pp} pp
+        LEFT JOIN {cippj} cippj on pp.{pp_id} = cippj.{cippj_ppfk}
         WHERE
             pp.{id} = $1    
         ",
-                p = PortPoolColumns::PORT.as_str(),
-                pp = TABLES::PORT_POOL.as_str(),
-                id = PortPoolColumns::ID.as_str()
+                pp_port = PortPoolColumns::PORT,
+                cippj_id = ContainerInstancePortPoolJunctionColumns::ID,
+                pp = TABLES::PORT_POOL,
+                cippj = TABLES::CONTAINER_INSTANCE_PORT_POOL_JUNCTION,
+                pp_id = PortPoolColumns::ID,
+                cippj_ppfk = ContainerInstancePortPoolJunctionColumns::PORT_POOL_FK,
+                id = PortPoolColumns::ID,
             )
             .as_str(),
-            &[(pp_id, Type::INT4)],
+            &[(ppp_id, Type::INT4)],
         )
         .await;
     select_result

@@ -9,6 +9,7 @@ use tokio_postgres::types::Type;
 use uuid::Uuid;
 
 use crate::{
+    db::load_balancers::{get_existing_load_balancer_by_image, ServiceLoadBalancersColumns},
     models::{
         service_container_models::{DockerImageId, ServiceContainer},
         service_image_models::ServiceImage,
@@ -61,12 +62,8 @@ pub async fn get_load_balancer_with_containers_by_image_id(
     exposed_port: String,
     address: String,
 ) -> Result<ServiceLoadBalancer, String> {
-    let load_balancer_query_results = POSTGRES_CLIENT.get().unwrap()
-        .query_typed("SELECT lb.id as lb_id, lb.head as lb_head, c.id as c_id, c.docker_container_id, c.public_port, c.uuid
-            from load_balancers lb
-            LEFT JOIN load_balancer_container_junction as lbcj ON lb.id = lbcj.load_balancer_fk
-            LEFT JOIN containers as c ON lbcj.container_fk = c.id
-            WHERE lb.image_fk = $1;",&[(image_fk.as_ref(), Type::INT4)] ).await;
+    let load_balancer_query_results = get_existing_load_balancer_by_image(&image_fk).await;
+    println!("existing lb result {:#?}", load_balancer_query_results);
     match load_balancer_query_results {
         Ok(rows) => {
             let mut containers: Vec<ServiceContainer> = Vec::new();
@@ -82,7 +79,7 @@ pub async fn get_load_balancer_with_containers_by_image_id(
                         containers.push(ServiceContainer {
                             id: c_id,
                             container_id: row.get::<&str, String>("docker_container_id"),
-                            public_port: row.get::<&str, i32>("public_port"),
+                            public_port: row.get::<&str, i32>("port"),
                             uuid: row.get::<&str, Uuid>("uuid"),
                         });
                     }
@@ -109,7 +106,10 @@ pub async fn get_load_balancer_with_containers_by_image_id(
                 create_new_service_load_balancer
             }
         }
-        Err(err) => Err(err.to_string()),
+        Err(err) => {
+            tracing::warn!("error when trying to get_existing_load_balancer_by_image");
+            Err(err.to_string())
+        }
     }
 }
 ///This function returns the load_balancer key and if it is a fresh load balancer does 3 things:

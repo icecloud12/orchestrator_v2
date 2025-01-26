@@ -43,19 +43,22 @@ impl ServiceContainerColumns {
 
 pub async fn container_insert_query(
     docker_container_id: &String,
-    cippk_id: &i32,
+    cippj_id: &i32,
 ) -> Result<Vec<Row>, Error> {
     let client = POSTGRES_CLIENT.get().unwrap();
     let insert_result = client
         .query_typed(
             format!(
-                "INSERT INTO {containers_table}
+                "INSERT INTO {containers_table} ({dcid}, {cippj_fk})
                 VALUES ($1, $2)
+                RETURNING *
             ",
-                containers_table = TABLES::SERVICE_CONTAINER.as_str(),
+                containers_table = TABLES::SERVICE_CONTAINER,
+                dcid = ServiceContainerColumns::DOCKER_CONTAINER_ID,
+                cippj_fk = ServiceContainerColumns::CONTAINER_INSTANCE_PORT_POOL_JUNCTION_FK
             )
             .as_str(),
-            &[(docker_container_id, Type::TEXT), (cippk_id, Type::INT4)],
+            &[(docker_container_id, Type::TEXT), (cippj_id, Type::INT4)],
         )
         .await;
     insert_result

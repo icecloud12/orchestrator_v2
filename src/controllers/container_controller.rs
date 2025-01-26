@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::{
     db::{
         container_instance_port_pool_junction::prepare_port_allocation,
-        containers::container_insert_query,
+        containers::{container_insert_query, ServiceContainerColumns},
     },
     models::service_container_models::ServiceContainer,
     utils::{docker_utils::DOCKER, orchestrator_utils::ORCHESTRATOR_URI},
@@ -26,7 +26,6 @@ pub async fn create_container(
         Ok((cippj_id, port, container_uuid)) => {
             //initialize docker container here
             let docker = DOCKER.get().unwrap();
-
             let mut port_binding = HashMap::new();
             port_binding.insert(
                 format!("{}/tcp", exposed_port),
@@ -47,7 +46,7 @@ pub async fn create_container(
                 image: Some(docker_image_id.to_owned()),
                 host_config: Some(host_config),
                 env: Some(vec![
-                    format!("uuid={}", &container_uuid.as_simple().to_string()),
+                    format!("uuid={}", &container_uuid.to_string()),
                     format!(
                         "orchestrator_uri={}",
                         ORCHESTRATOR_URI.get().unwrap().as_str()
@@ -67,13 +66,16 @@ pub async fn create_container(
                             //we are only expect 1 result
                             let row = &rows[0];
                             Ok(ServiceContainer {
-                                id: row.get::<&str, i32>("id"),
+                                id: row.get::<&str, i32>(ServiceContainerColumns::ID.as_str()),
                                 container_id: res.id,
                                 public_port: *port,
                                 uuid: container_uuid,
                             })
                         }
-                        Err(err) => Err(err.to_string()),
+                        Err(err) => {
+                            tracing::error!("Postgress Container Creation Error: {:#?}", err);
+                            Err(err.to_string())
+                        }
                     }
                 }
                 Err(err) => Err(format!("Docker Create Container Error: {:#?}", err)),
