@@ -11,9 +11,10 @@ use crate::{
             get_or_init_load_balancer, ELoadBalancerMode, AWAITED_CONTAINERS,
             AWAITED_LOADBALANCERS, LOADBALANCERS,
         },
-        request_controller::{record_service_request_acceptance, record_service_request_responded},
+        request_controller::record_service_request_acceptance,
         route_controller::route_resolver,
     },
+    db::requests::update_request_responded,
     models::{
         service_container_models::ServiceContainer, service_image_models::ServiceImage,
         service_load_balancer::ServiceLoadBalancer, service_route_model::ServiceRoute,
@@ -63,7 +64,8 @@ pub async fn route_to_service_handler(
                         request_path,
                         request_method,
                         image_fk.clone(),
-                    );
+                    )
+                    .await;
 
                     //queue_ing logic for await_load_balancers
                     let awaited_lb_hm = AWAITED_LOADBALANCERS.get().unwrap();
@@ -122,7 +124,7 @@ pub async fn route_to_service_handler(
                                                     response.status().as_u16() as i32;
                                                 return_response(response, tcp_stream).await;
                                                 tracing::info!("Responded to requestor");
-                                                record_service_request_responded(
+                                                update_request_responded(
                                                     service_request_uuid,
                                                     &container_id,
                                                     response_status,
@@ -133,7 +135,7 @@ pub async fn route_to_service_handler(
                                                 tracing::error!("Something went wrong when trying to forward request to service");
                                                 //errors concerning the connection towards the address
                                                 return_503(tcp_stream).await;
-                                                record_service_request_responded(
+                                                update_request_responded(
                                                     service_request_uuid, //formatting why do you do this man
                                                     &container_id,
                                                     503,
@@ -161,7 +163,7 @@ pub async fn route_to_service_handler(
                                                     Err(docker_start_error) => {
                                                         return_500(tcp_stream, docker_start_error)
                                                             .await;
-                                                        record_service_request_responded(
+                                                        update_request_responded(
                                                             service_request_uuid,
                                                             &new_container.id,
                                                             500,
@@ -173,7 +175,7 @@ pub async fn route_to_service_handler(
                                             Err(docker_create_error) => {
                                                 tracing::error!("Docker error: Failure to create container [docker_image_id: {}]", &lb.docker_image_id);
                                                 return_500(tcp_stream, docker_create_error).await;
-                                                record_service_request_responded(
+                                                update_request_responded(
                                                     service_request_uuid, //formatting why do you do this man
                                                     &-1,
                                                     500,
@@ -205,7 +207,7 @@ pub async fn route_to_service_handler(
                                                     return_500(tcp_stream, container_start_error)
                                                         .await;
 
-                                                    record_service_request_responded(
+                                                    update_request_responded(
                                                         service_request_uuid, //formatting why do you do this man
                                                         &new_container.id,
                                                         500,
@@ -217,7 +219,7 @@ pub async fn route_to_service_handler(
                                         Err(container_create_error) => {
                                             return_500(tcp_stream, container_create_error).await;
 
-                                            record_service_request_responded(
+                                            update_request_responded(
                                                 service_request_uuid, //formatting why do you do this man
                                                 &-1,
                                                 500,
@@ -312,7 +314,7 @@ pub async fn container_ready(
                         Ok(response) => {
                             let response_status = response.status().as_u16() as i32;
                             return_response(response, tcp_stream).await;
-                            record_service_request_responded(
+                            update_request_responded(
                                 service_request_uuid,
                                 &container_fk,
                                 response_status,
