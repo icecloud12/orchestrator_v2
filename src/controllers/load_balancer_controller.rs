@@ -1,22 +1,23 @@
-use custom_tcp_listener::models::types::Request;
-use std::{
-    collections::HashMap,
-    ops::Deref,
-    sync::{Arc, OnceLock},
-};
-use tokio::{net::TcpStream, sync::Mutex};
-use tokio_postgres::types::Type;
-use uuid::Uuid;
-
 use crate::{
-    db::load_balancers::{get_existing_load_balancer_by_image, ServiceLoadBalancersColumns},
+    db::{
+        container_instance_port_pool_junction::ContainerInstancePortPoolJunctionColumns,
+        containers::ServiceContainerColumns,
+        load_balancers::{get_existing_load_balancer_by_image, ServiceLoadBalancersColumns},
+        port_pool::PortPoolColumns,
+    },
     models::{
         service_container_models::{DockerImageId, ServiceContainer},
         service_image_models::ServiceImage,
         service_load_balancer::ServiceLoadBalancer,
     },
-    utils::postgres_utils::POSTGRES_CLIENT,
 };
+use custom_tcp_listener::models::types::Request;
+use std::{
+    collections::HashMap,
+    sync::{Arc, OnceLock},
+};
+use tokio::{net::TcpStream, sync::Mutex};
+use uuid::Uuid;
 
 pub static LOADBALANCERS: OnceLock<Arc<Mutex<HashMap<DockerImageId, ServiceLoadBalancer>>>> =
     OnceLock::new();
@@ -72,15 +73,26 @@ pub async fn get_load_balancer_with_containers_by_image_id(
             if !rows.is_empty() {
                 for row in rows.into_iter() {
                     if id.is_none() {
-                        id = Some(row.get::<&str, i32>("lb_id"));
-                        head = Some(row.get::<&str, i32>("lb_head"));
+                        //execute this only on the first row result
+                        id = Some(row.get::<&str, i32>(ServiceLoadBalancersColumns::ID.as_str()));
+                        head =
+                            Some(row.get::<&str, i32>(ServiceLoadBalancersColumns::HEAD.as_str()));
                     }
-                    if let Ok(c_id) = row.try_get::<&str, i32>("c_id") {
+                    if let Ok(c_id) = row.try_get::<&str, i32>(ServiceContainerColumns::ID.as_str())
+                    {
                         containers.push(ServiceContainer {
                             id: c_id,
-                            container_id: row.get::<&str, String>("docker_container_id"),
-                            public_port: row.get::<&str, i32>("port"),
-                            uuid: row.get::<&str, Uuid>("uuid"),
+                            container_id: row.get::<&str, String>(
+                                ServiceContainerColumns::DOCKER_CONTAINER_ID.as_str(),
+                            ),
+                            public_port: row.get::<&str, i32>(PortPoolColumns::PORT.as_str()),
+                            uuid: row.get::<&str, Uuid>(
+                                ContainerInstancePortPoolJunctionColumns::UUID.as_str(),
+                            ),
+                            cippj_fk: row.get::<&str, i32>(
+                                ServiceContainerColumns::CONTAINER_INSTANCE_PORT_POOL_JUNCTION_FK
+                                    .as_str(),
+                            ),
                         });
                     }
                 }
@@ -121,14 +133,14 @@ pub async fn get_or_init_load_balancer(
     address: String,
     exposed_port: String,
     service_image: ServiceImage,
-) -> Result<(DockerImageId, bool, Option<Vec<i32>>), String> {
+) -> Result<(DockerImageId, bool), String> {
     //get the image first
 
     //matching image
     let hm = LOADBALANCERS.get().unwrap().lock().await;
     match hm.get(&service_image.docker_image_id) {
         //we can only return the key to access the lb because it is owned by the mutex
-        Some(_service_load_balancer) => Ok((service_image.docker_image_id, false, None)), //returns an existing load-balance
+        Some(_service_load_balancer) => Ok((service_image.docker_image_id, false)), //returns an existing load-balance
         None => {
             //
             drop(hm);
@@ -169,16 +181,16 @@ pub async fn get_or_init_load_balancer(
                     let mut container_len = lb.containers.len();
                     let mut awaited_container_len = lb.awaited_containers.len();
                     let mut new_lb: bool = container_len + awaited_container_len == 0;
-                    let new_lb_check: Result<Option<Vec<i32>>, String> = if !new_lb {
-                        let pruned_containers: Result<Option<Vec<i32>>, String> =
+                    let new_lb_check: Option<String> = if !new_lb {
+                        let validate_containers_result: Result<(), String> =
                             lb.validate_containers().await;
-                        match pruned_containers {
-                            Ok(option_vec_container_id) => {
+                        match validate_containers_result {
+                            Ok(_) => {
                                 container_len = lb.containers.len();
                                 awaited_container_len = lb.awaited_containers.len();
                                 if container_len > 0 {
                                     lb.mode = ELoadBalancerMode::FORWARD;
-                                    Ok(option_vec_container_id)
+                                    None
                                 } else if awaited_container_len > 0 {
                                     let awaited_containers = &lb.awaited_containers;
                                     let any_entry = awaited_containers.iter().next().unwrap();
@@ -194,14 +206,14 @@ pub async fn get_or_init_load_balancer(
                                     let result = match start_container_result {
                                         Ok(_) => {
                                             drop(awaited_container_lock);
-                                            Ok(option_vec_container_id)
+                                            None
                                         }
                                         Err(err) => {
                                             //remove the entry from the hashmap
                                             let _remove_option = awaited_container_lock
                                                 .remove(&any_entry.1.uuid.to_string());
                                             drop(awaited_container_lock);
-                                            Err(err.to_string())
+                                            Some(err.to_string())
                                         }
                                     };
                                     result
@@ -209,21 +221,21 @@ pub async fn get_or_init_load_balancer(
                                     //somehhow goes here
                                     lb.mode = ELoadBalancerMode::FORWARD;
                                     new_lb = true;
-                                    Ok(option_vec_container_id)
+                                    None
                                 }
                             }
-                            Err(docker_error) => Err(docker_error),
+                            Err(docker_error) => Some(docker_error),
                         }
                     } else {
-                        Ok(None)
+                        None
                     };
                     match new_lb_check {
-                        Ok(pruned_container_ids) => {
+                        Some(err) => Err(err),
+                        None => {
                             hm.insert(service_image.docker_image_id.clone(), lb);
                             drop(hm);
-                            Ok((service_image.docker_image_id, new_lb, pruned_container_ids))
+                            Ok((service_image.docker_image_id, new_lb))
                         }
-                        Err(err) => Err(err),
                     }
                 }
 

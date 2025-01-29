@@ -8,10 +8,8 @@ use uuid::Uuid;
 
 use crate::{
     controllers::{
-        container_controller, 
-        load_balancer_controller::{ELoadBalancerBehavior, ELoadBalancerMode, AWAITED_CONTAINERS}, load_balancer_container_junction_controller,
-    },
-    utils::{docker_utils::DOCKER, postgres_utils::POSTGRES_CLIENT},
+        container_controller, load_balancer_container_junction_controller, load_balancer_controller::{ELoadBalancerBehavior, ELoadBalancerMode, AWAITED_CONTAINERS}
+    }, db::container_instance_port_pool_junction::deallocate_port, utils::{docker_utils::DOCKER, postgres_utils::POSTGRES_CLIENT}
 };
 
 use super::service_container_models::ServiceContainer;
@@ -128,12 +126,13 @@ impl ServiceLoadBalancer {
     ///This function returns an Option of Vec<ServiceContainer> where
     ///The Vec<i32> defines the invalid container id(s) to prune out of the db rows
     ///for both load_balancer_container_junction and container tables
-    pub async fn validate_containers(&mut self) -> Result<Option<Vec<i32>>,String> {
-        let containers: Vec<ServiceContainer> = std::mem::take(&mut self.containers);
+    pub async fn validate_containers(&mut self) -> Result<(),String> {
+        let lb_containers: Vec<ServiceContainer> = std::mem::take(&mut self.containers);
         let mut container_map: HashMap<String, ServiceContainer> = HashMap::new();
-        containers.into_iter().for_each(|container| {
+        lb_containers.into_iter().for_each(|container| {
             container_map.insert(container.container_id.clone(), container);
         });
+        //docker filters
         let mut filters = HashMap::new();
 
         filters.insert("id", container_map.keys().map(|k| k.as_str()).collect());
@@ -145,7 +144,7 @@ impl ServiceLoadBalancer {
         let docker = DOCKER.get().unwrap();
         let container_list_result = match docker.list_containers(Some(options)).await {
             Ok(container_list) => {
-                let mut await_container_lock = AWAITED_CONTAINERS.get().unwrap().lock().await;
+                // let mut await_container_lock = AWAITED_CONTAINERS.get().unwrap().lock().await;
                 
                 for container_summary in container_list.into_iter() {
                     let container_status = container_summary.state.unwrap();
@@ -155,28 +154,17 @@ impl ServiceLoadBalancer {
                             .unwrap();
 
                         self.containers.push(container);
-                    } else {
-                        let container = container_map
-                            .remove(container_summary.id.unwrap().as_str())
-                            .unwrap();
-                        //if we cannot start the container we must remove the container from db and docker
-                        //await the containers before trying to start
-                            let uuid = container.uuid.clone();
-                            await_container_lock
-                                .insert(uuid.to_string(), self.docker_image_id.clone());
-                            let awaited_containers = &mut self.awaited_containers;
-                            awaited_containers.insert(uuid.to_string(), container);
-                            
-                    };
+                    }
                 }
                 if container_map.is_empty() {
-                    Ok(None)
+                    return Ok(());
                 }else{
-                    Ok(Some(
-                        container_map.into_iter().map( |(_key, container)| {
-                            container.id
-                        }).collect()
-                    ))
+                    // if container_map still has remaining entries then these containers are no longer valid
+                    let deallocate_ids_buffer: Vec<i32> = container_map.into_iter().map(|(_key, value)| {
+                         return value.cippj_fk;
+                    }).collect();
+                    deallocate_port(deallocate_ids_buffer);
+                    return Ok(());
                 }
                 
                 //lock should be dropped here

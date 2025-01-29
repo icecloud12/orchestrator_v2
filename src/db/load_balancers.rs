@@ -41,7 +41,6 @@ impl ServiceLoadBalancersColumns {
 
 pub async fn get_existing_load_balancer_by_image(image_fk: &i32) -> Result<Vec<Row>, Error> {
     let client = POSTGRES_CLIENT.get().unwrap();
-    //TODO continue where i left off after CIPPJ
     client
         .query_typed(
             format!(
@@ -51,8 +50,9 @@ pub async fn get_existing_load_balancer_by_image(image_fk: &i32) -> Result<Vec<R
                 lb.{lb_head} as lb_head,
                 c.{c_id} as c_id,
                 c.{c_docker_container_id},
+                c.{c_cippj_fk}
                 pp.{pp_port},
-                cippj.{cippj_uuid}
+                cippj.{cippj_uuid},
             FROM
                 {lb_table} lb
             LEFT JOIN
@@ -71,6 +71,7 @@ pub async fn get_existing_load_balancer_by_image(image_fk: &i32) -> Result<Vec<R
                 lb_head = ServiceLoadBalancersColumns::HEAD,
                 c_id = ServiceContainerColumns::ID,
                 c_docker_container_id = ServiceContainerColumns::DOCKER_CONTAINER_ID,
+                c_cippj_fk = ServiceContainerColumns::CONTAINER_INSTANCE_PORT_POOL_JUNCTION_FK,
                 pp_port = PortPoolColumns::PORT,
                 cippj_uuid = ContainerInstancePortPoolJunctionColumns::UUID,
                 lb_table = TABLES::SERVICE_LOADBALANCERS,

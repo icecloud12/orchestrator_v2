@@ -5,7 +5,7 @@ use super::{
 };
 use crate::utils::{orchestrator_utils::ORCHESTRATOR_PUBLIC_UUID, postgres_utils::POSTGRES_CLIENT};
 use std::{fmt::Display, sync::Arc};
-use tokio_postgres::{types::Type, Error, Row};
+use tokio_postgres::{types::Type, Error, GenericClient, Row};
 use uuid::Uuid;
 
 pub enum ContainerInstancePortPoolJunctionColumns {
@@ -110,4 +110,27 @@ pub async fn prepare_port_allocation() -> Result<(i32, Arc<i32>, Uuid), Error> {
             return Err(err);
         }
     };
+}
+
+pub fn deallocate_port(cippj_ids: Vec<i32>) {
+    tokio::spawn(async move {
+        let client = POSTGRES_CLIENT.get().unwrap();
+        //the problem is that when this fails we might now be able to correct it anymore
+        // maybe use a background process to clean it up instead
+        let _update_result = client
+            .query_typed(
+                format!(
+                    "
+                UPDATE {cippj_table} SET {cippj_in_use} = false
+                WHERE {cippj_ids} in $1
+            ",
+                    cippj_table = TABLES::CONTAINER_INSTANCE_PORT_POOL_JUNCTION,
+                    cippj_in_use = ContainerInstancePortPoolJunctionColumns::IN_USE,
+                    cippj_ids = ContainerInstancePortPoolJunctionColumns::ID,
+                )
+                .as_str(),
+                &[(&cippj_ids, Type::INT4_ARRAY)],
+            )
+            .await;
+    });
 }

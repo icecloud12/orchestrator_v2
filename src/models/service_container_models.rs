@@ -4,10 +4,16 @@ use uuid::Uuid;
 
 #[derive(Debug)]
 pub struct ServiceContainer {
+    ///postgres id
     pub id: i32,
+    ///Docker container id
     pub container_id: String, // docker internal id of the docker container
-    pub public_port: i32,     //
+    ///current port it is assigned with
+    pub public_port: i32,
+    ///auto-generated id used to identify itself when announcing it is ready
     pub uuid: Uuid,
+    //container instance port pool junction fk
+    pub cippj_fk: i32
 }
 #[derive(Debug)]
 pub struct ServiceContainerBody {

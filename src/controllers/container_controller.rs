@@ -70,6 +70,7 @@ pub async fn create_container(
                                 container_id: res.id,
                                 public_port: *port,
                                 uuid: container_uuid,
+                                cippj_fk: cippj_id
                             })
                         }
                         Err(err) => {

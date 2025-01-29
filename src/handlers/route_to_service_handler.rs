@@ -56,7 +56,6 @@ pub async fn route_to_service_handler(
                         exposed_port,
                         ..
                     } = service_route;
-                    //maybe do some optimizations where Request from custom tcp listener having some fields initially be in Arc
                     let request_path = Arc::new(request.path.clone());
                     let request_method = Arc::new(request.method.clone());
 
@@ -90,7 +89,6 @@ pub async fn route_to_service_handler(
                         let lb_mutex = LOADBALANCERS.get().unwrap();
                         let mut lb_hm = lb_mutex.lock().await;
                         let lb = lb_hm.get_mut(&lb_key).unwrap();
-                        println!("{:#?}", lb);
                         match lb.mode {
                             ELoadBalancerMode::FORWARD => {
                                 let next_container_result = lb.next_container().await;
