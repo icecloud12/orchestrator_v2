@@ -78,7 +78,7 @@ pub async fn route_to_service_handler(
                     } else {
                         drop(awaited_lb_lock);
                         //dropping the lock here because it is used on the next function
-                        let (lb_key, new_lb, option_pruned_containers) = get_or_init_load_balancer(
+                        let (lb_key, new_lb) = get_or_init_load_balancer(
                             image_fk,
                             prefix,
                             exposed_port,
@@ -232,9 +232,6 @@ pub async fn route_to_service_handler(
                         };
                         drop(lb_hm);
                         //prune the containers //it is okay to fail here
-                        if let Some(container_ids) = option_pruned_containers {
-                            ServiceLoadBalancer::remove_containers(container_ids).await;
-                        }
                     }
                 }
             }
