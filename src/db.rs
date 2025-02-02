@@ -9,3 +9,5 @@ pub mod port_pool;
 pub mod requests;
 pub mod routes;
 pub mod tables;
+pub mod request_traces;
+pub mod request_trace_types;

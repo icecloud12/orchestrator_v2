@@ -10,6 +10,7 @@ pub enum TABLES {
     SERVICE_CONTAINER,
     SERVICE_LOADBALANCERS,
     SERVICE_REQUEST,
+    REQUEST_TRACES
 }
 
 impl Display for TABLES {
@@ -26,6 +27,7 @@ impl Display for TABLES {
             }
             Self::SERVICE_LOADBALANCERS => write!(f, "load_balancers"),
             Self::LOAD_BALANCER_CONTAINER_JUNCTION => write!(f, "load_balancer_container_junction"),
+            Self::REQUEST_TRACES => write!(f, "request_traces"),
         }
     }
 }
@@ -42,6 +44,7 @@ impl TABLES {
             Self::CONTAINER_INSTANCE_PORT_POOL_JUNCTION => "container_instance_port_pool_junction",
             Self::SERVICE_LOADBALANCERS => "load_balancers",
             Self::LOAD_BALANCER_CONTAINER_JUNCTION => "load_balancer_container_junction",
+            Self::REQUEST_TRACES => "request_traces"
         }
     }
 }
