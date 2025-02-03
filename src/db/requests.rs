@@ -41,43 +41,6 @@ impl ServiceRequestColumns {
     }
 }
 //
-// This function must be called and NOT spawned as a different task from the tcp_stream it should be matched with logically
-// the problem with this function is that this should be allowed to fail;
-// pub async fn insert_request_acceptance_query(
-//     path: Arc<String>,
-//     method: Arc<String>,
-//     image_fk: Arc<i32>,
-//     uuid: Arc<Uuid>
-//     ) -> Result<Vec<Row>, Error> {
-//     let client = POSTGRES_CLIENT.get().unwrap();
-//     let insert_result = client
-//         .query_typed(
-//             format!(
-//                 "
-//             INSERT INTO {sr_table}
-//             ({sr_path}, {sr_uuid}, {sr_accepted_time}, {sr_method}, {sr_orchestrator_instance}, {sr_image_fk} )
-//             VALUES ($1, $2, NOW(), $3, $4, $5);
-//         ",
-//             sr_table= TABLES::SERVICE_REQUEST.as_str(),
-//             sr_path= ServiceRequestColumns::PATH,
-//             sr_uuid= ServiceRequestColumns::UUID,
-//             sr_accepted_time= ServiceRequestColumns::ACCEPTED_TIME,
-//             sr_method = ServiceRequestColumns::METHOD,
-//             sr_orchestrator_instance = ServiceRequestColumns::ORCHESTRATOR_INSTANCE_FK,
-//             sr_image_fk = ServiceRequestColumns::IMAGE_FK                
-//             )
-//             .as_str(),
-//             &[
-//                 (path.as_ref(), Type::TEXT),
-//                 (uuid.as_ref(), Type::UUID),
-//                 (method.as_ref(), Type::TEXT),
-//                 (ORCHESTRATOR_INSTANCE_ID.get().unwrap(), Type::INT4),
-//                 (image_fk.as_ref(), Type::INT4)
-//             ],
-//         )
-//         .await;
-//     insert_result
-// }
 
 // pub async fn update_request_responded(
 //     uuid: Arc<Uuid>,

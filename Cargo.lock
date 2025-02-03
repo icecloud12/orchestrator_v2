@@ -185,8 +185,10 @@ checksum = "7e36cc9d416881d2e24f9a963be5fb1cd90966419ac844274161d10488b3e825"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-targets",
 ]
 
@@ -1014,6 +1016,7 @@ name = "orchestrator_v2"
 version = "0.1.0"
 dependencies = [
  "bollard",
+ "chrono",
  "custom-tcp-listener",
  "dotenv",
  "http",
@@ -1128,6 +1131,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f66ea23a2d0e5734297357705193335e0a957696f34bed2f2faefacb2fec336f"
 dependencies = [
  "bytes",
+ "chrono",
  "fallible-iterator",
  "postgres-protocol",
  "uuid",

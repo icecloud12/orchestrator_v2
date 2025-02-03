@@ -14,10 +14,9 @@ use crate::{
         request_controller::record_service_request_acceptance,
         route_controller::route_resolver,
     },
-    db::requests::update_request_responded,
     models::{
         service_container_models::ServiceContainer, service_image_models::ServiceImage,
-        service_load_balancer::ServiceLoadBalancer, service_route_model::ServiceRoute,
+        service_route_model::ServiceRoute,
     },
     utils::orchestrator_utils::{return_404, return_500, return_503, return_response},
 };

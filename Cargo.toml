@@ -20,9 +20,10 @@ tokio = { version = "1.40.0", features = ["full"] }
 rand = "0.8.5"
 uuid = { version = "1.11.0", features = ["v4"] }
 custom-tcp-listener = { git = "https://github.com/icecloud12/custom-tcp-listener.git" }
-tokio-postgres = { version = "0.7.12", features = ["with-uuid-1"] }
+tokio-postgres = { version = "0.7.12", features = ["with-chrono-0_4", "with-uuid-1"] }
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
+chrono = "0.4.39"
 
 [profile.release]
 debug = true
