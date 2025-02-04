@@ -7,16 +7,17 @@ use crate::utils::{orchestrator_utils::ORCHESTRATOR_INSTANCE_ID, postgres_utils:
 
 use super::tables::TABLES;
 
-pub enum ServiceRequestColumns {
+pub enum EServiceRequestColumns {
     ID,
     UUID,
     PATH,
     METHOD,
     IMAGE_FK,
     ORCHESTRATOR_INSTANCE_FK,
+    STATUS_CODE
 }
 
-impl Display for ServiceRequestColumns {
+impl Display for EServiceRequestColumns {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
             Self::ID => write!(f, "id"),
@@ -25,10 +26,11 @@ impl Display for ServiceRequestColumns {
             Self::METHOD => write!(f, "method"),
             Self::IMAGE_FK => write!(f, "image_fk"),
             Self::ORCHESTRATOR_INSTANCE_FK => write!(f, "orchestrator_instance_fk"),
+            Self::STATUS_CODE => write!(f, "status_code"),
         }
     }
 }
-impl ServiceRequestColumns {
+impl EServiceRequestColumns {
     pub fn as_str(&self) -> &str {
         match *self {
             Self::ID => "id",
@@ -37,6 +39,7 @@ impl ServiceRequestColumns {
             Self::METHOD => "method",
             Self::IMAGE_FK => "image_fk",
             Self::ORCHESTRATOR_INSTANCE_FK => "orchestrator_instance_fk",
+            Self::STATUS_CODE => "status_code",
         }
     }
 }

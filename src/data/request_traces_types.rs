@@ -1,4 +1,5 @@
 ///The int32 values represent the actual ID numbers in the database
+// #[derive(Copy, Clone)]
 pub enum ERequestTraceTypes {
     INTERCEPTED = 1,
     FORWARDED = 2,
