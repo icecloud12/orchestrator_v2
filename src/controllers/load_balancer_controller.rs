@@ -1,8 +1,7 @@
 use crate::{
     db::{
         container_instance_port_pool_junction::ContainerInstancePortPoolJunctionColumns,
-        containers::ServiceContainerColumns,
-        load_balancers::{get_existing_load_balancer_by_image, ServiceLoadBalancersColumns},
+        containers::ServiceContainerColumns, load_balancers::get_existing_load_balancer_by_image,
         port_pool::PortPoolColumns,
     },
     models::{
@@ -74,12 +73,10 @@ pub async fn get_load_balancer_with_containers_by_image_id(
                 for row in rows.into_iter() {
                     if id.is_none() {
                         //execute this only on the first row result
-                        id = Some(row.get::<&str, i32>(ServiceLoadBalancersColumns::ID.as_str()));
-                        head =
-                            Some(row.get::<&str, i32>(ServiceLoadBalancersColumns::HEAD.as_str()));
+                        id = Some(row.get::<&str, i32>("lb_id"));
+                        head = Some(row.get::<&str, i32>("lb_head"));
                     }
-                    if let Ok(c_id) = row.try_get::<&str, i32>(ServiceContainerColumns::ID.as_str())
-                    {
+                    if let Ok(c_id) = row.try_get::<&str, i32>("c_id") {
                         containers.push(ServiceContainer {
                             id: c_id,
                             container_id: row.get::<&str, String>(
