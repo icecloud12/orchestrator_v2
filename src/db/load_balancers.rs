@@ -50,9 +50,9 @@ pub async fn get_existing_load_balancer_by_image(image_fk: &i32) -> Result<Vec<R
                 lb.{lb_head} as lb_head,
                 c.{c_id} as c_id,
                 c.{c_docker_container_id},
-                c.{c_cippj_fk}
+                c.{c_cippj_fk},
                 pp.{pp_port},
-                cippj.{cippj_uuid},
+                cippj.{cippj_uuid}
             FROM
                 {lb_table} lb
             LEFT JOIN
