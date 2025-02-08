@@ -3,7 +3,7 @@ use crate::{
     utils::{orchestrator_utils::ORCHESTRATOR_INSTANCE_ID, postgres_utils::POSTGRES_CLIENT},
 };
 use chrono::{DateTime, Utc};
-use std::{fmt::Display, sync::Arc};
+use std::{arch::x86_64::_mm_insert_epi16, fmt::Display, sync::Arc};
 use tokio_postgres::{types::Type, GenericClient};
 use uuid::Uuid;
 
@@ -77,9 +77,14 @@ pub async fn insert_request_acceptance_query(
                 ],
             )
             .await;
-        insert_request_trace(uuid_cloned, ERequestTraceTypes::INTERCEPTED as i32, None, dt).await;
+        insert_request_trace(
+            uuid_cloned,
+            ERequestTraceTypes::INTERCEPTED as i32,
+            None,
+            dt,
+        )
+        .await;
     });
-    
 }
 pub async fn insert_request_trace(
     request_uuid: Arc<Uuid>,
@@ -117,11 +122,7 @@ pub async fn insert_request_trace(
 }
 ///
 /// This function is called at the end of the request trace so no need to create a task for it to query independently
-pub async fn update_request_responded(
-    request_uuid: Arc<Uuid>,
-    container_id: &i32,
-    status_code: i32,
-) {
+pub async fn insert_finalized_trace(request_uuid: Arc<Uuid>, status_code: i32) {
     let client = POSTGRES_CLIENT.get().unwrap();
     let dt = Utc::now();
     //update service request table
@@ -145,11 +146,17 @@ pub async fn update_request_responded(
             ],
         )
         .await;
-    insert_request_trace(
-        request_uuid,
-        ERequestTraceTypes::FINALIZED as i32,
-        Some(container_id),
-        dt,
-    )
-    .await;
+    insert_request_trace(request_uuid, ERequestTraceTypes::FINALIZED as i32, None, dt).await;
+}
+
+pub fn insert_forward_trace(request_uuid: Arc<Uuid>, container_id: Arc<i32>) {
+    tokio::spawn(async move {
+        insert_request_trace(
+            request_uuid,
+            ERequestTraceTypes::FORWARDED as i32,
+            Some(container_id.as_ref()),
+            Utc::now(),
+        )
+        .await;
+    });
 }
