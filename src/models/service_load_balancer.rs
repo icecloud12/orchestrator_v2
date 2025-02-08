@@ -67,18 +67,18 @@ impl ServiceLoadBalancer {
     /// 1. if it's newly created
     /// 2. the recorded load_balancer in the database have/have no entries
     //returns Ok((Option<container_port>, Option<AwaitedContainerInstance>),()>
-    pub async fn next_container(&mut self) -> Result<(i32,i32), ()> {
+    pub async fn next_container(&mut self) -> Option<(i32,i32)> {
         let containers = &self.containers;
 
         let container_len:i32 = containers.len() as i32;
-        let ret: Result<(i32, i32), ()> = if container_len == 0 {
+        let ret: Option<(i32, i32)> = if container_len == 0 {
             // let create_container_result = self.create_container().await;
             // //maybe create some logic before creating the container here for scalability logic
             // match create_container_result {
             //     Ok(container_port) => Ok(container_port),
             //     Err(err) => Err(err),
             // }
-            Err(())
+            None
         } else {
             //has container entries
             //move the head
@@ -87,7 +87,7 @@ impl ServiceLoadBalancer {
             let container_ref = containers.get(*head as usize).unwrap();
             let public_port = container_ref.public_port.clone();
             let container_fk = container_ref.id.clone();
-            Ok((public_port, container_fk))
+            Some((public_port, container_fk))
         };
         ret
     }

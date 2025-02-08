@@ -13,10 +13,13 @@ use crate::{
         },
         request_controller::record_service_request_acceptance,
         route_controller::route_resolver,
-    }, db::request_traces::update_request_responded, models::{
+    },
+    db::request_traces::{insert_finalized_trace, insert_forward_trace},
+    models::{
         service_container_models::ServiceContainer, service_image_models::ServiceImage,
         service_route_model::ServiceRoute,
-    }, utils::orchestrator_utils::{return_404, return_500, return_503, return_response}
+    },
+    utils::orchestrator_utils::{return_404, return_500, return_503, return_response},
 };
 
 pub async fn route_to_service_handler(
@@ -90,7 +93,11 @@ pub async fn route_to_service_handler(
                             ELoadBalancerMode::FORWARD => {
                                 let next_container_result = lb.next_container().await;
                                 match next_container_result {
-                                    Ok((container_public_port, container_id)) => {
+                                    Some((container_public_port, container_id)) => {
+                                        insert_forward_trace(
+                                            service_request_uuid.clone(),
+                                            Arc::new(container_id),
+                                        );
                                         let client_builder = reqwest::ClientBuilder::new();
                                         let client = client_builder
                                             .danger_accept_invalid_certs(true)
@@ -100,6 +107,7 @@ pub async fn route_to_service_handler(
                                             "http://localhost:{}{}",
                                             &container_public_port, request.path
                                         );
+
                                         let send_request_result: Result<
                                             reqwest::Response,
                                             reqwest::Error,
@@ -119,9 +127,8 @@ pub async fn route_to_service_handler(
                                                     response.status().as_u16() as i32;
                                                 return_response(response, tcp_stream).await;
                                                 tracing::info!("Responded to requestor");
-                                                update_request_responded(
+                                                insert_finalized_trace(
                                                     service_request_uuid,
-                                                    &container_id,
                                                     response_status,
                                                 )
                                                 .await;
@@ -130,16 +137,15 @@ pub async fn route_to_service_handler(
                                                 tracing::error!("Something went wrong when trying to forward request to service");
                                                 //errors concerning the connection towards the address
                                                 return_503(tcp_stream).await;
-                                                update_request_responded(
+                                                insert_finalized_trace(
                                                     service_request_uuid, //formatting why do you do this man
-                                                    &container_id,
                                                     503,
                                                 )
                                                 .await;
                                             }
                                         }
                                     }
-                                    Err(_) => {
+                                    None => {
                                         //cannot next as it is empty
                                         //create the container here
                                         match lb.create_container().await {
@@ -158,9 +164,8 @@ pub async fn route_to_service_handler(
                                                     Err(docker_start_error) => {
                                                         return_500(tcp_stream, docker_start_error)
                                                             .await;
-                                                        update_request_responded(
+                                                        insert_finalized_trace(
                                                             service_request_uuid,
-                                                            &new_container.id,
                                                             500,
                                                         )
                                                         .await;
@@ -170,9 +175,8 @@ pub async fn route_to_service_handler(
                                             Err(docker_create_error) => {
                                                 tracing::error!("Docker error: Failure to create container [docker_image_id: {}]", &lb.docker_image_id);
                                                 return_500(tcp_stream, docker_create_error).await;
-                                                update_request_responded(
+                                                insert_finalized_trace(
                                                     service_request_uuid, //formatting why do you do this man
-                                                    &-1,
                                                     500,
                                                 )
                                                 .await;
@@ -202,9 +206,8 @@ pub async fn route_to_service_handler(
                                                     return_500(tcp_stream, container_start_error)
                                                         .await;
 
-                                                    update_request_responded(
+                                                    insert_finalized_trace(
                                                         service_request_uuid, //formatting why do you do this man
-                                                        &new_container.id,
                                                         500,
                                                     )
                                                     .await;
@@ -214,9 +217,8 @@ pub async fn route_to_service_handler(
                                         Err(container_create_error) => {
                                             return_500(tcp_stream, container_create_error).await;
 
-                                            update_request_responded(
+                                            insert_finalized_trace(
                                                 service_request_uuid, //formatting why do you do this man
-                                                &-1,
                                                 500,
                                             )
                                             .await;
@@ -285,6 +287,10 @@ pub async fn container_ready(
                 service_load_balancer.mode = ELoadBalancerMode::FORWARD;
                 let queue = service_load_balancer.empty_queue();
                 for (request, tcp_stream, service_request_uuid) in queue.into_iter() {
+                    insert_forward_trace(
+                        service_request_uuid.clone(),
+                        Arc::new(container_fk.clone()),
+                    );
                     //foward all queued stream to the newly made container
                     //todo NEED TO STORE THE REQUEST INFO AS WELL
                     let client_builder = reqwest::ClientBuilder::new();
@@ -304,17 +310,15 @@ pub async fn container_ready(
                         .await;
                     match send_request_result {
                         Ok(response) => {
+                            //insert returned trace
                             let response_status = response.status().as_u16() as i32;
                             return_response(response, tcp_stream).await;
-                            update_request_responded(
-                                service_request_uuid,
-                                &container_fk,
-                                response_status,
-                            )
-                            .await;
+                            insert_finalized_trace(service_request_uuid, response_status).await;
                         }
                         Err(_) => {
+                            //insert failed_trace
                             return_503(tcp_stream).await;
+                            insert_finalized_trace(service_request_uuid, StatusCode::SERVICE_UNAVAILABLE.as_u16() as i32).await;
                         }
                     };
                 }
