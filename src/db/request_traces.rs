@@ -150,13 +150,29 @@ pub async fn insert_finalized_trace(request_uuid: Arc<Uuid>, status_code: i32) {
 }
 
 pub fn insert_forward_trace(request_uuid: Arc<Uuid>, container_id: Arc<i32>) {
+    let dt = Utc::now();
     tokio::spawn(async move {
         insert_request_trace(
             request_uuid,
             ERequestTraceTypes::FORWARDED as i32,
             Some(container_id.as_ref()),
-            Utc::now(),
+            dt
         )
         .await;
+    });
+}
+
+pub fn insert_failed_trace(request_uuid: Arc<Uuid>){
+    //create dt outside tokio spawn so it uses the time spawn is created and not when the spawn is executed
+    let dt = Utc::now();
+    tokio::spawn(async move{
+        insert_request_trace(request_uuid, ERequestTraceTypes::FAILED as i32, None, dt).await;
+    });
+}
+
+pub fn insert_returned_trace(request_uuid: Arc<Uuid>){
+    let dt = Utc::now();
+    tokio::spawn(async move{
+         insert_request_trace(request_uuid, ERequestTraceTypes::RETURNED as i32, None, dt).await;
     });
 }

@@ -114,6 +114,15 @@ impl ServiceLoadBalancer {
         let container_ref = containers.last().unwrap();
         container_ref
     }
+    pub fn remove_container(&mut self, container_id: i32) -> Option<ServiceContainer> {
+        let containers = &mut self.containers;
+        let index = containers.iter().position(|c| c.id == container_id);
+        if index.is_some() {
+            Some(containers.remove(index.unwrap()))
+        }else{
+            None
+        }
+    }
     pub async fn queue_container(&mut self, container: ServiceContainer) {
         let mut await_container_lock = AWAITED_CONTAINERS.get().unwrap().lock().await;
         await_container_lock.insert(container.uuid.to_string(), self.docker_image_id.clone());

@@ -1,19 +1,26 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 use bollard::{
     container::{Config, CreateContainerOptions},
     secret::{HostConfig, PortBinding},
 };
+use custom_tcp_listener::models::types::Request;
+use http::StatusCode;
 use rand::Rng;
+use tokio::net::TcpStream;
 use uuid::Uuid;
 
 use crate::{
     db::{
         container_instance_port_pool_junction::prepare_port_allocation,
         containers::{container_insert_query, ServiceContainerColumns},
+        request_traces::{insert_finalized_trace, insert_forward_trace},
     },
     models::service_container_models::ServiceContainer,
-    utils::{docker_utils::DOCKER, orchestrator_utils::ORCHESTRATOR_URI},
+    utils::{
+        docker_utils::DOCKER,
+        orchestrator_utils::{return_503, return_response, ORCHESTRATOR_URI},
+    },
 };
 
 ///load_balancer_key is the docker_image_id
@@ -70,7 +77,7 @@ pub async fn create_container(
                                 container_id: res.id,
                                 public_port: *port,
                                 uuid: container_uuid,
-                                cippj_fk: cippj_id
+                                cippj_fk: cippj_id,
                             })
                         }
                         Err(err) => {
@@ -84,4 +91,51 @@ pub async fn create_container(
         }
         Err(err) => Err(format!("Postgres Port Allocation Error: {:#?}", err)),
     }
+}
+pub async fn forward_request(
+    request: Request,
+    tcp_stream: TcpStream,
+    request_uuid: Arc<Uuid>,
+    container_id: Arc<i32>,
+    container_port: &i32,
+) -> bool {
+    insert_forward_trace(request_uuid.clone(), container_id.clone());
+    //foward all queued stream to the newly made container
+    //todo NEED TO STORE THE REQUEST INFO AS WELL
+    let client_builder = reqwest::ClientBuilder::new();
+    let client = client_builder
+        .danger_accept_invalid_certs(true)
+        .build()
+        .unwrap();
+    let url = format!("http://localhost:{}{}", &container_port, request.path);
+    let send_request_result = client
+        .request(
+            reqwest::Method::from_str(request.method.as_str()).unwrap(),
+            url,
+        )
+        .headers(request.headers)
+        .body(request.body)
+        .send()
+        .await;
+
+    match send_request_result {
+        Ok(response) => {
+            //insert returned trace
+            let response_status = response.status().as_u16() as i32;
+            return_response(response, tcp_stream).await;
+            insert_finalized_trace(request_uuid, response_status).await;
+            return true;
+        }
+        Err(_) => {
+            //insert failed_trace
+            return_503(tcp_stream).await;
+            insert_finalized_trace(
+                request_uuid,
+                StatusCode::SERVICE_UNAVAILABLE.as_u16() as i32,
+            )
+            .await;
+            //remove container from the lb
+            return false;
+        }
+    };
 }

@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     controllers::{
+        container_controller::forward_request,
         load_balancer_controller::{
             get_or_init_load_balancer, ELoadBalancerMode, AWAITED_CONTAINERS,
             AWAITED_LOADBALANCERS, LOADBALANCERS,
@@ -14,7 +15,9 @@ use crate::{
         request_controller::record_service_request_acceptance,
         route_controller::route_resolver,
     },
-    db::request_traces::{insert_finalized_trace, insert_forward_trace},
+    db::request_traces::{
+        insert_failed_trace, insert_finalized_trace, insert_forward_trace, insert_returned_trace,
+    },
     models::{
         service_container_models::ServiceContainer, service_image_models::ServiceImage,
         service_route_model::ServiceRoute,
@@ -94,55 +97,16 @@ pub async fn route_to_service_handler(
                                 let next_container_result = lb.next_container().await;
                                 match next_container_result {
                                     Some((container_public_port, container_id)) => {
-                                        insert_forward_trace(
-                                            service_request_uuid.clone(),
+                                        let is_forward_succes = forward_request(
+                                            request,
+                                            tcp_stream,
+                                            service_request_uuid,
                                             Arc::new(container_id),
-                                        );
-                                        let client_builder = reqwest::ClientBuilder::new();
-                                        let client = client_builder
-                                            .danger_accept_invalid_certs(true)
-                                            .build()
-                                            .unwrap();
-                                        let url = format!(
-                                            "http://localhost:{}{}",
-                                            &container_public_port, request.path
-                                        );
-
-                                        let send_request_result: Result<
-                                            reqwest::Response,
-                                            reqwest::Error,
-                                        > = client
-                                            .request(
-                                                reqwest::Method::from_str(request.method.as_str())
-                                                    .unwrap(),
-                                                url,
-                                            )
-                                            .headers(request.headers)
-                                            .body(request.body)
-                                            .send()
-                                            .await;
-                                        match send_request_result {
-                                            Ok(response) => {
-                                                let response_status =
-                                                    response.status().as_u16() as i32;
-                                                return_response(response, tcp_stream).await;
-                                                tracing::info!("Responded to requestor");
-                                                insert_finalized_trace(
-                                                    service_request_uuid,
-                                                    response_status,
-                                                )
-                                                .await;
-                                            }
-                                            Err(_) => {
-                                                tracing::error!("Something went wrong when trying to forward request to service");
-                                                //errors concerning the connection towards the address
-                                                return_503(tcp_stream).await;
-                                                insert_finalized_trace(
-                                                    service_request_uuid, //formatting why do you do this man
-                                                    503,
-                                                )
-                                                .await;
-                                            }
+                                            &container_public_port,
+                                        )
+                                        .await;
+                                        if !is_forward_succes {
+                                            lb.remove_container(container_id);
                                         }
                                     }
                                     None => {
@@ -255,10 +219,10 @@ pub async fn container_ready(
     println!("awaited containers {:#?}", awaited_containers);
     let load_balancer_key_option = awaited_containers.remove(uuid);
     drop(awaited_containers);
-    if let Some(load_balancer_key) = load_balancer_key_option {
+    if let Some(lb_key) = load_balancer_key_option {
         let load_balacer_mutex = LOADBALANCERS.get().unwrap();
         let mut load_balancers = load_balacer_mutex.lock().await;
-        let service_load_balancer = load_balancers.get_mut(&load_balancer_key).unwrap();
+        let service_load_balancer = load_balancers.get_mut(&lb_key).unwrap();
         let awaited_container_key_val_pair = service_load_balancer
             .awaited_containers
             .remove_entry(uuid)
@@ -268,7 +232,7 @@ pub async fn container_ready(
         let container_ref: &ServiceContainer =
             service_load_balancer.add_container(readied_container);
         let &ServiceContainer {
-            id: container_fk,
+            id: container_id,
             public_port: container_port,
             ..
         } = container_ref;
@@ -286,43 +250,32 @@ pub async fn container_ready(
             ELoadBalancerMode::QUEUE => {
                 service_load_balancer.mode = ELoadBalancerMode::FORWARD;
                 let queue = service_load_balancer.empty_queue();
+                let mut drop_requests: bool = false;
                 for (request, tcp_stream, service_request_uuid) in queue.into_iter() {
-                    insert_forward_trace(
-                        service_request_uuid.clone(),
-                        Arc::new(container_fk.clone()),
-                    );
-                    //foward all queued stream to the newly made container
-                    //todo NEED TO STORE THE REQUEST INFO AS WELL
-                    let client_builder = reqwest::ClientBuilder::new();
-                    let client = client_builder
-                        .danger_accept_invalid_certs(true)
-                        .build()
-                        .unwrap();
-                    let url = format!("http://localhost:{}{}", &container_port, request.path);
-                    let send_request_result = client
-                        .request(
-                            reqwest::Method::from_str(request.method.as_str()).unwrap(),
-                            url,
+                    if drop_requests {
+                        //a forward already failed so we need to drop the rest of the request WITHOUT retrying
+                        return_503(tcp_stream).await;
+                        insert_finalized_trace(
+                            service_request_uuid,
+                            StatusCode::SERVICE_UNAVAILABLE.as_u16() as i32,
                         )
-                        .headers(request.headers)
-                        .body(request.body)
-                        .send()
                         .await;
-                    match send_request_result {
-                        Ok(response) => {
-                            //insert returned trace
-                            let response_status = response.status().as_u16() as i32;
-                            return_response(response, tcp_stream).await;
-                            insert_finalized_trace(service_request_uuid, response_status).await;
+                    } else {
+                        let is_forward_succes = forward_request(
+                            request,
+                            tcp_stream,
+                            service_request_uuid,
+                            Arc::new(container_id),
+                            &container_port,
+                        )
+                        .await;
+                        if !is_forward_succes {
+                            //container is uncommunicatable
+                            service_load_balancer.remove_container(container_id);
+                            drop_requests = true;
                         }
-                        Err(_) => {
-                            //insert failed_trace
-                            return_503(tcp_stream).await;
-                            insert_finalized_trace(service_request_uuid, StatusCode::SERVICE_UNAVAILABLE.as_u16() as i32).await;
-                        }
-                    };
+                    }
                 }
-                service_load_balancer.request_queue = Vec::new();
             }
             ELoadBalancerMode::FORWARD => {
                 //do nothing
@@ -330,7 +283,6 @@ pub async fn container_ready(
                 print!("here");
             }
         };
-        service_load_balancer.request_queue = Vec::new();
     }
 
     Ok(())
