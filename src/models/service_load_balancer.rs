@@ -98,8 +98,8 @@ impl ServiceLoadBalancer {
 
         match col {
             Ok(service_container) => {
-                let _ = load_balancer_container_junction_controller::create(&self.id, &service_container.id)
-                    .await;
+                // it is ok that it fails but if that was the case then the container is non-trackable
+                load_balancer_container_junction_controller::create(Arc::new(self.id), Arc::new(service_container.id));
                 Ok(service_container)
             }
             Err(err) => Err(err),
@@ -118,6 +118,7 @@ impl ServiceLoadBalancer {
         let containers = &mut self.containers;
         let index = containers.iter().position(|c| c.id == container_id);
         if index.is_some() {
+            //create a tokio spawn here to deallocate the container db wise
             Some(containers.remove(index.unwrap()))
         }else{
             None

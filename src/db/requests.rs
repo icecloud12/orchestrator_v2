@@ -1,12 +1,4 @@
-use std::{fmt::Display, sync::Arc};
-
-use tokio_postgres::{types::Type, Error, Row};
-use uuid::Uuid;
-
-use crate::utils::{orchestrator_utils::ORCHESTRATOR_INSTANCE_ID, postgres_utils::POSTGRES_CLIENT};
-
-use super::tables::TABLES;
-
+use std::fmt::Display;
 pub enum EServiceRequestColumns {
     ID,
     UUID,
