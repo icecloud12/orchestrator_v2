@@ -3,15 +3,10 @@ use http::StatusCode;
 use reqwest::Response;
 use std::sync::OnceLock;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
-use tokio_postgres::types::Type;
 use uuid::Uuid;
 
-use super::postgres_utils::POSTGRES_CLIENT;
-use crate::db::orchestrator_instances::{
-    create_orchestrator_instance_query, OrchestratorInstanceColumns,
-};
+use crate::db::orchestrator_instances::create_orchestrator_instance_query;
 use crate::db::orchestrators::OrchestratorColumns;
-use crate::db::tables::TABLES;
 
 pub static ORCHESTRATOR_URI: OnceLock<String> = OnceLock::new();
 pub static ORCHESTRATOR_PUBLIC_UUID: OnceLock<Uuid> = OnceLock::new();
