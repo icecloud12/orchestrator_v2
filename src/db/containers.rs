@@ -1,16 +1,9 @@
 use std::fmt::Display;
 use tokio_postgres::{types::Type, Error, Row};
-use uuid::Uuid;
 
 use crate::utils::postgres_utils::POSTGRES_CLIENT;
 
-use super::{
-    container_instance_port_pool_junction::{
-        allocate_port, ContainerInstancePortPoolJunctionColumns,
-    },
-    port_pool::{get_port_pool, PortPoolColumns},
-    tables::TABLES,
-};
+use super::tables::ETables;
 
 pub enum ServiceContainerColumns {
     ID,
@@ -53,7 +46,7 @@ pub async fn container_insert_query(
                 VALUES ($1, $2)
                 RETURNING *
             ",
-                containers_table = TABLES::SERVICE_CONTAINER,
+                containers_table = ETables::SERVICE_CONTAINER,
                 dcid = ServiceContainerColumns::DOCKER_CONTAINER_ID,
                 cippj_fk = ServiceContainerColumns::CONTAINER_INSTANCE_PORT_POOL_JUNCTION_FK
             )

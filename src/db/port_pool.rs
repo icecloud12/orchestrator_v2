@@ -1,11 +1,11 @@
 use std::fmt::Display;
 
-use tokio_postgres::{types::Type, Error, GenericClient, Row};
+use tokio_postgres::{types::Type, Error, Row};
 
 use crate::utils::postgres_utils::POSTGRES_CLIENT;
 
 use super::{
-    container_instance_port_pool_junction::ContainerInstancePortPoolJunctionColumns, tables::TABLES,
+    container_instance_port_pool_junction::ContainerInstancePortPoolJunctionColumns, tables::ETables,
 };
 
 pub enum PortPoolColumns {
@@ -47,8 +47,8 @@ pub async fn get_port_pool(ppp_id: &i32) -> Result<Vec<Row>, Error> {
         ",
                 pp_port = PortPoolColumns::PORT,
                 cippj_id = ContainerInstancePortPoolJunctionColumns::ID,
-                pp = TABLES::PORT_POOL,
-                cippj = TABLES::CONTAINER_INSTANCE_PORT_POOL_JUNCTION,
+                pp = ETables::PORT_POOL,
+                cippj = ETables::CONTAINER_INSTANCE_PORT_POOL_JUNCTION,
                 pp_id = PortPoolColumns::ID,
                 cippj_ppfk = ContainerInstancePortPoolJunctionColumns::PORT_POOL_FK,
                 id = PortPoolColumns::ID,

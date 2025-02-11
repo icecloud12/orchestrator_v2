@@ -1,7 +1,7 @@
 use super::{
     orchestrators::OrchestratorColumns,
     port_pool::{get_port_pool, PortPoolColumns},
-    tables::TABLES,
+    tables::ETables,
 };
 use crate::utils::{orchestrator_utils::ORCHESTRATOR_PUBLIC_UUID, postgres_utils::POSTGRES_CLIENT};
 use std::{fmt::Display, sync::Arc};
@@ -60,13 +60,13 @@ pub async fn allocate_port() -> Result<Vec<Row>, Error> {
             TRUE)
         RETURNING *
     ",
-                cippj = TABLES::CONTAINER_INSTANCE_PORT_POOL_JUNCTION.as_str(),
+                cippj = ETables::CONTAINER_INSTANCE_PORT_POOL_JUNCTION.as_str(),
                 cippj_ppfk = ContainerInstancePortPoolJunctionColumns::PORT_POOL_FK.as_str(),
                 cippj_in_use = ContainerInstancePortPoolJunctionColumns::IN_USE.as_str(),
-                pp = TABLES::PORT_POOL.as_str(),
+                pp = ETables::PORT_POOL.as_str(),
                 pp_id = PortPoolColumns::ID.as_str(),
                 pp_o_fk = PortPoolColumns::ORCHESTRATOR_FK.as_str(),
-                o_table = TABLES::ORCHESTRATORS.as_str(),
+                o_table = ETables::ORCHESTRATORS.as_str(),
                 o_table_id = OrchestratorColumns::ID.as_str(),
                 o_table_pub_uuid = OrchestratorColumns::PUBLIC_UUID.as_str(),
             )
@@ -124,7 +124,7 @@ pub fn deallocate_port(cippj_ids: Vec<i32>) {
                 UPDATE {cippj_table} SET {cippj_in_use} = false
                 WHERE {cippj_ids} in $1
             ",
-                    cippj_table = TABLES::CONTAINER_INSTANCE_PORT_POOL_JUNCTION,
+                    cippj_table = ETables::CONTAINER_INSTANCE_PORT_POOL_JUNCTION,
                     cippj_in_use = ContainerInstancePortPoolJunctionColumns::IN_USE,
                     cippj_ids = ContainerInstancePortPoolJunctionColumns::ID,
                 )

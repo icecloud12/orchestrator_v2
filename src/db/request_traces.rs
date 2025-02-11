@@ -7,7 +7,7 @@ use std::{arch::x86_64::_mm_insert_epi16, fmt::Display, sync::Arc};
 use tokio_postgres::{types::Type, GenericClient};
 use uuid::Uuid;
 
-use super::{requests::EServiceRequestColumns, tables::TABLES};
+use super::{requests::EServiceRequestColumns, tables::ETables};
 
 pub enum ERequestTracesColumns {
     ID,
@@ -60,7 +60,7 @@ pub async fn insert_request_acceptance_query(
                 ({sr_path}, {sr_uuid}, {sr_method}, {sr_orchestrator_instance}, {sr_image_fk} )
                 VALUES ($1, $2, $3, $4, $5);
             ",
-                    sr_table = TABLES::SERVICE_REQUEST.as_str(),
+                    sr_table = ETables::SERVICE_REQUEST.as_str(),
                     sr_path = EServiceRequestColumns::PATH,
                     sr_uuid = EServiceRequestColumns::UUID,
                     sr_method = EServiceRequestColumns::METHOD,
@@ -104,7 +104,7 @@ pub async fn insert_request_trace(
                     {rt_container_id_fk}
                     ) VALUES ($1, $2, $3, $4)
             ",
-                rt_table = TABLES::REQUEST_TRACES,
+                rt_table = ETables::REQUEST_TRACES,
                 rt_uuid = ERequestTracesColumns::REQUEST_UUID,
                 rt_ttfk = ERequestTracesColumns::REQUEST_TRACE_TYPES_FK,
                 rt_timestamp = ERequestTracesColumns::TIMESTAMP,
@@ -135,7 +135,7 @@ pub async fn insert_finalized_trace(request_uuid: Arc<Uuid>, status_code: i32) {
             SET {sr_status_code} = $1
             WHERE {sr_uuid} = $2
         ",
-                sr_table = TABLES::SERVICE_REQUEST,
+                sr_table = ETables::SERVICE_REQUEST,
                 sr_status_code = EServiceRequestColumns::STATUS_CODE,
                 sr_uuid = EServiceRequestColumns::UUID
             )

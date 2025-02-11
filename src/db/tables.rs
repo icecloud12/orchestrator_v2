@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-pub enum TABLES {
+pub enum ETables{
     CONTAINER_INSTANCE_PORT_POOL_JUNCTION,
     LOAD_BALANCER_CONTAINER_JUNCTION,
     ORCHESTRATORS,
@@ -13,7 +13,7 @@ pub enum TABLES {
     REQUEST_TRACES
 }
 
-impl Display for TABLES {
+impl Display for ETables {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
             Self::SERVICE_ROUTE => write!(f, "routes"),
@@ -32,7 +32,7 @@ impl Display for TABLES {
     }
 }
 
-impl TABLES {
+impl ETables {
     pub fn as_str(&self) -> &str {
         match *self {
             Self::SERVICE_ROUTE => "routes",
