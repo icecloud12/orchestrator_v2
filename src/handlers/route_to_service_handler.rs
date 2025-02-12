@@ -97,7 +97,7 @@ pub async fn route_to_service_handler(
                                 let next_container_result = lb.next_container().await;
                                 match next_container_result {
                                     Some((container_public_port, container_id)) => {
-                                        let is_forward_succes = forward_request(
+                                        let is_forward_success = forward_request(
                                             request,
                                             tcp_stream,
                                             service_request_uuid,
@@ -105,8 +105,8 @@ pub async fn route_to_service_handler(
                                             &container_public_port,
                                         )
                                         .await;
-                                        if !is_forward_succes {
-                                            lb.remove_container(container_id);
+                                        if !is_forward_success {
+                                            lb.remove_container(container_id).await;
                                         }
                                     }
                                     None => {
@@ -261,7 +261,7 @@ pub async fn container_ready(
                         )
                         .await;
                     } else {
-                        let is_forward_succes = forward_request(
+                        let is_forward_success = forward_request(
                             request,
                             tcp_stream,
                             service_request_uuid,
@@ -269,9 +269,9 @@ pub async fn container_ready(
                             &container_port,
                         )
                         .await;
-                        if !is_forward_succes {
+                        if !is_forward_success {
                             //container is uncommunicatable
-                            service_load_balancer.remove_container(container_id);
+                            service_load_balancer.remove_container(container_id).await;
                             drop_requests = true;
                         }
                     }

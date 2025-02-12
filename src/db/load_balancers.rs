@@ -7,7 +7,7 @@ use crate::utils::postgres_utils::POSTGRES_CLIENT;
 use super::{
     container_instance_port_pool_junction::ContainerInstancePortPoolJunctionColumns,
     containers::ServiceContainerColumns,
-    load_balancer_container_junctions::LoadBalancerContainerJunctionColumns,
+    load_balancer_container_junctions::ELoadBalancerContainerJunctionColumns,
     port_pool::PortPoolColumns, tables::ETables,
 };
 
@@ -76,9 +76,9 @@ pub async fn get_existing_load_balancer_by_image(image_fk: &i32) -> Result<Vec<R
                 cippj_uuid = ContainerInstancePortPoolJunctionColumns::UUID,
                 lb_table = ETables::SERVICE_LOADBALANCERS,
                 lbcj_table = ETables::LOAD_BALANCER_CONTAINER_JUNCTION,
-                lbcj_lbfk = LoadBalancerContainerJunctionColumns::LOAD_BALANCER_FK,
+                lbcj_lbfk = ELoadBalancerContainerJunctionColumns::LOAD_BALANCER_FK,
                 c_table = ETables::SERVICE_CONTAINER,
-                lbcj_cfk = LoadBalancerContainerJunctionColumns::CONTAINER_FK,
+                lbcj_cfk = ELoadBalancerContainerJunctionColumns::CONTAINER_FK,
                 cippj_table = ETables::CONTAINER_INSTANCE_PORT_POOL_JUNCTION,
                 c_cippjfk = ServiceContainerColumns::CONTAINER_INSTANCE_PORT_POOL_JUNCTION_FK,
                 cippj_id = ContainerInstancePortPoolJunctionColumns::ID,

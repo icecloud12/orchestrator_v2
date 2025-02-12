@@ -115,14 +115,14 @@ pub async fn prepare_port_allocation() -> Result<(i32, Arc<i32>, Uuid), Error> {
 pub fn deallocate_port(cippj_ids: Vec<i32>) {
     tokio::spawn(async move {
         let client = POSTGRES_CLIENT.get().unwrap();
-        //the problem is that when this fails we might now be able to correct it anymore
+        //the problem is that when this fails we might not be able to correct it anymore since it is a new task
         // maybe use a background process to clean it up instead
         let _update_result = client
             .query_typed(
                 format!(
                     "
                 UPDATE {cippj_table} SET {cippj_in_use} = false
-                WHERE {cippj_ids} in $1
+                WHERE {cippj_ids} = ANY($1)
             ",
                     cippj_table = ETables::CONTAINER_INSTANCE_PORT_POOL_JUNCTION,
                     cippj_in_use = ContainerInstancePortPoolJunctionColumns::IN_USE,
@@ -132,5 +132,6 @@ pub fn deallocate_port(cippj_ids: Vec<i32>) {
                 &[(&cippj_ids, Type::INT4_ARRAY)],
             )
             .await;
+        print!("{:#?}", _update_result);
     });
 }

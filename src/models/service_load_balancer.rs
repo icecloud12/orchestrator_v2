@@ -114,12 +114,15 @@ impl ServiceLoadBalancer {
         let container_ref = containers.last().unwrap();
         container_ref
     }
-    pub fn remove_container(&mut self, container_id: i32) -> Option<ServiceContainer> {
+    pub async fn remove_container(&mut self, container_id: i32) -> Option<ServiceContainer> {
         let containers = &mut self.containers;
         let index = containers.iter().position(|c| c.id == container_id);
         if index.is_some() {
-            //create a tokio spawn here to deallocate the container db wise
-            Some(containers.remove(index.unwrap()))
+            tracing::info!("[INFO] Dropping Container");
+            let container = containers.remove(index.unwrap());
+            deallocate_port(vec![container.cippj_fk]);// free port usage
+            let _delete_container_result = container.delete_container().await;
+            Some(container)
         }else{
             None
         }
