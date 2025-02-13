@@ -3,8 +3,8 @@ use crate::{
     utils::{orchestrator_utils::ORCHESTRATOR_INSTANCE_ID, postgres_utils::POSTGRES_CLIENT},
 };
 use chrono::{DateTime, Utc};
-use std::{arch::x86_64::_mm_insert_epi16, fmt::Display, sync::Arc};
-use tokio_postgres::{types::Type, GenericClient};
+use std::{fmt::Display, sync::Arc};
+use tokio_postgres::types::Type;
 use uuid::Uuid;
 
 use super::{requests::EServiceRequestColumns, tables::ETables};
@@ -25,17 +25,6 @@ impl Display for ERequestTracesColumns {
             Self::REQUEST_TRACE_TYPES_FK => write!(f, "request_trace_types_fk"),
             Self::CONTAINER_ID_FK => write!(f, "container_id_fk"),
             Self::TIMESTAMP => write!(f, "timestamp"),
-        }
-    }
-}
-impl ERequestTracesColumns {
-    pub fn as_str(&self) -> &str {
-        match *self {
-            Self::ID => "id",
-            Self::REQUEST_UUID => "request_uuid",
-            Self::REQUEST_TRACE_TYPES_FK => "request_trace_types_fk",
-            Self::CONTAINER_ID_FK => "container_id_fk",
-            Self::TIMESTAMP => "timestamp",
         }
     }
 }
@@ -60,7 +49,7 @@ pub async fn insert_request_acceptance_query(
                 ({sr_path}, {sr_uuid}, {sr_method}, {sr_orchestrator_instance}, {sr_image_fk} )
                 VALUES ($1, $2, $3, $4, $5);
             ",
-                    sr_table = ETables::SERVICE_REQUEST.as_str(),
+                    sr_table = ETables::SERVICE_REQUEST,
                     sr_path = EServiceRequestColumns::PATH,
                     sr_uuid = EServiceRequestColumns::UUID,
                     sr_method = EServiceRequestColumns::METHOD,

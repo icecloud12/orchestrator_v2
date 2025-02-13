@@ -14,12 +14,3 @@ impl Display for OrchestratorColumns {
         }
     }
 }
-impl OrchestratorColumns {
-    pub fn as_str(&self) -> &str {
-        match *self {
-            Self::ID => "id",
-            Self::NAME => "name",
-            Self::PUBLIC_UUID => "public_uuid",
-        }
-    }
-}

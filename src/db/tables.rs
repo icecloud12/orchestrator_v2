@@ -32,19 +32,3 @@ impl Display for ETables {
     }
 }
 
-impl ETables {
-    pub fn as_str(&self) -> &str {
-        match *self {
-            Self::SERVICE_ROUTE => "routes",
-            Self::SERVICE_REQUEST => "requests",
-            Self::ORCHESTRATORS => "orchestrators",
-            Self::ORCHESTRATOR_INSTANCE => "orchestrator_instances",
-            Self::SERVICE_CONTAINER => "containers",
-            Self::PORT_POOL => "port_pool",
-            Self::CONTAINER_INSTANCE_PORT_POOL_JUNCTION => "container_instance_port_pool_junction",
-            Self::SERVICE_LOADBALANCERS => "load_balancers",
-            Self::LOAD_BALANCER_CONTAINER_JUNCTION => "load_balancer_container_junction",
-            Self::REQUEST_TRACES => "request_traces"
-        }
-    }
-}

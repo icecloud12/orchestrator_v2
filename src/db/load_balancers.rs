@@ -28,17 +28,6 @@ impl Display for ServiceLoadBalancersColumns {
     }
 }
 
-impl ServiceLoadBalancersColumns {
-    pub fn as_str(&self) -> &str {
-        match *self {
-            Self::ID => "id",
-            Self::IMAGE_FK => "image_fk",
-            Self::HEAD => "head",
-            Self::BEHAVIOR => "behavior",
-        }
-    }
-}
-
 pub async fn get_existing_load_balancer_by_image(image_fk: &i32) -> Result<Vec<Row>, Error> {
     let client = POSTGRES_CLIENT.get().unwrap();
     client

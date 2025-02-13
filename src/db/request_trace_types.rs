@@ -13,13 +13,3 @@ impl Display for ERequestTraceTypesColumns {
         }
     }
 }
-
-impl ERequestTraceTypesColumns {
-    pub fn as_str(&self) -> &str {
-        match *self {
-            Self::ID => "id",
-            Self::DESCRIPTION => "description"
-        }
-    }
-}
-

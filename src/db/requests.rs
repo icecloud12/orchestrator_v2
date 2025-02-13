@@ -22,16 +22,3 @@ impl Display for EServiceRequestColumns {
         }
     }
 }
-impl EServiceRequestColumns {
-    pub fn as_str(&self) -> &str {
-        match *self {
-            Self::ID => "id",
-            Self::UUID => "uuid",
-            Self::PATH => "path",
-            Self::METHOD => "method",
-            Self::IMAGE_FK => "image_fk",
-            Self::ORCHESTRATOR_INSTANCE_FK => "orchestrator_instance_fk",
-            Self::STATUS_CODE => "status_code",
-        }
-    }
-}

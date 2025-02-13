@@ -1,4 +1,4 @@
-use tokio_postgres::{types::Type, Error, Row};
+use tokio_postgres::types::Type;
 
 use crate::utils::postgres_utils::POSTGRES_CLIENT;
 use std::{fmt::Display, sync::Arc};
@@ -20,15 +20,6 @@ impl Display for ELoadBalancerContainerJunctionColumns {
     }
 }
 
-impl ELoadBalancerContainerJunctionColumns {
-    pub fn as_str(&self) -> &str {
-        match *self {
-            Self::ID => "id",
-            Self::LOAD_BALANCER_FK => "load_balancer_fk",
-            Self::CONTAINER_FK => "container_fk",
-        }
-    }
-}
 
 pub fn insert_lbcj(load_balancer_id: Arc<i32>, container_id: Arc<i32>) {
     tokio::spawn(async move {
@@ -44,7 +35,10 @@ pub fn insert_lbcj(load_balancer_id: Arc<i32>, container_id: Arc<i32>) {
                     lbcj_cfk = ELoadBalancerContainerJunctionColumns::CONTAINER_FK
                 )
                 .as_str(),
-                &[(load_balancer_id.as_ref(), Type::INT4), (container_id.as_ref(), Type::INT4)],
+                &[
+                    (load_balancer_id.as_ref(), Type::INT4),
+                    (container_id.as_ref(), Type::INT4),
+                ],
             )
             .await;
     });
