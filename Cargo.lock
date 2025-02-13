@@ -1023,7 +1023,6 @@ dependencies = [
  "httparse",
  "hyper",
  "log",
- "rand",
  "regex",
  "reqwest",
  "serde",
