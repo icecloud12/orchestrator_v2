@@ -6,15 +6,14 @@ use bollard::{
 };
 use custom_tcp_listener::models::types::Request;
 use http::StatusCode;
-use rand::Rng;
 use tokio::net::TcpStream;
 use uuid::Uuid;
 
 use crate::{
     db::{
-        container_instance_port_pool_junction::prepare_port_allocation,
+        container_instance_port_pool_junction::{deallocate_port, prepare_port_allocation},
         containers::{container_insert_query, ServiceContainerColumns},
-        request_traces::{insert_finalized_trace, insert_forward_trace},
+        request_traces::{insert_failed_trace, insert_finalized_trace, insert_forward_trace, insert_returned_trace},
     },
     models::service_container_models::ServiceContainer,
     utils::{
@@ -81,6 +80,7 @@ pub async fn create_container(
                             })
                         }
                         Err(err) => {
+                            deallocate_port(vec![cippj_id]);
                             tracing::error!("Postgress Container Creation Error: {:#?}", err);
                             Err(err.to_string())
                         }
@@ -120,14 +120,14 @@ pub async fn forward_request(
 
     match send_request_result {
         Ok(response) => {
-            //insert returned trace
+            insert_returned_trace(request_uuid.clone());
             let response_status = response.status().as_u16() as i32;
             return_response(response, tcp_stream).await;
             insert_finalized_trace(request_uuid, response_status).await;
             return true;
         }
         Err(_) => {
-            //insert failed_trace
+            insert_failed_trace(request_uuid.clone());
             return_503(tcp_stream).await;
             insert_finalized_trace(
                 request_uuid,
