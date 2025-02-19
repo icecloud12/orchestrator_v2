@@ -16,12 +16,13 @@ use std::{
     sync::{Arc, OnceLock},
 };
 use tokio::{net::TcpStream, sync::Mutex};
+use tokio_rustls::server::TlsStream;
 use uuid::Uuid;
 
 pub static LOADBALANCERS: OnceLock<Arc<Mutex<HashMap<DockerImageId, ServiceLoadBalancer>>>> =
     OnceLock::new();
 pub static AWAITED_LOADBALANCERS: OnceLock<
-    Arc<Mutex<HashMap<DockerImageId, Vec<(Request, TcpStream, Arc<Uuid>)>>>>,
+    Arc<Mutex<HashMap<DockerImageId, Vec<(Request, TlsStream<TcpStream>, Arc<Uuid>)>>>>,
 > = OnceLock::new();
 pub static AWAITED_CONTAINERS: OnceLock<Arc<Mutex<HashMap<String, String>>>> = OnceLock::new();
 #[derive(Debug)]

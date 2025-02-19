@@ -4,6 +4,7 @@ use bollard::{container::ListContainersOptions, service::ContainerStateStatusEnu
 use custom_tcp_listener::models::types::Request;
 use tokio::net::TcpStream;
 use tokio_postgres::types::Type;
+use tokio_rustls::server::TlsStream;
 use uuid::Uuid;
 
 use crate::{
@@ -27,7 +28,7 @@ pub struct ServiceLoadBalancer {
     pub containers: Vec<ServiceContainer>, //docker_container_id_instances
     pub awaited_containers: HashMap<String, ServiceContainer>, //docker_containers not pushed to the active container vector
     pub validated: bool, //initially false to let the program know if the containers are checke,
-    pub request_queue: Vec<(Request, TcpStream, Arc<Uuid>)>,
+    pub request_queue: Vec<(Request, TlsStream<TcpStream>, Arc<Uuid>)>,
 }
 
 impl ServiceLoadBalancer {
@@ -105,7 +106,7 @@ impl ServiceLoadBalancer {
             Err(err) => Err(err),
         }
     }
-    pub fn queue_request(&mut self, request: Request, tcp_stream: TcpStream, request_uuid: Arc<Uuid>) {
+    pub fn queue_request(&mut self, request: Request, tcp_stream: TlsStream<TcpStream>, request_uuid: Arc<Uuid>) {
         self.request_queue.push((request, tcp_stream, request_uuid));
     }
     pub fn add_container(&mut self, container: ServiceContainer) -> &ServiceContainer {
@@ -133,7 +134,7 @@ impl ServiceLoadBalancer {
         let awaited_containers = &mut self.awaited_containers;
         awaited_containers.insert(container.uuid.to_string(), container);
     }
-    pub fn empty_queue(&mut self) -> Vec<(Request, TcpStream, Arc<Uuid>)> {
+    pub fn empty_queue(&mut self) -> Vec<(Request, TlsStream<TcpStream>, Arc<Uuid>)> {
         std::mem::take(&mut self.request_queue)
     }
     ///This function returns an Option of Vec<ServiceContainer> where

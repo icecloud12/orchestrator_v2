@@ -7,13 +7,17 @@ use bollard::{
 use custom_tcp_listener::models::types::Request;
 use http::StatusCode;
 use tokio::net::TcpStream;
+use tokio_rustls::server::TlsStream;
 use uuid::Uuid;
 
 use crate::{
     db::{
         container_instance_port_pool_junction::{deallocate_port, prepare_port_allocation},
         containers::{container_insert_query, ServiceContainerColumns},
-        request_traces::{insert_failed_trace, insert_finalized_trace, insert_forward_trace, insert_returned_trace},
+        request_traces::{
+            insert_failed_trace, insert_finalized_trace, insert_forward_trace,
+            insert_returned_trace,
+        },
     },
     models::service_container_models::ServiceContainer,
     utils::{
@@ -94,7 +98,7 @@ pub async fn create_container(
 }
 pub async fn forward_request(
     request: Request,
-    tcp_stream: TcpStream,
+    tcp_stream: TlsStream<TcpStream>,
     request_uuid: Arc<Uuid>,
     container_id: Arc<i32>,
     container_port: &i32,

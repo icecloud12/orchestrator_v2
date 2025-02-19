@@ -1,8 +1,9 @@
-use std::{error::Error, str::FromStr, sync::Arc};
+use std::{error::Error, sync::Arc};
 
 use custom_tcp_listener::models::{router::response_to_bytes, types::Request};
 use http::StatusCode;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
+use tokio_rustls::server::TlsStream;
 use uuid::Uuid;
 
 use crate::{
@@ -15,19 +16,17 @@ use crate::{
         request_controller::record_service_request_acceptance,
         route_controller::route_resolver,
     },
-    db::request_traces::{
-        insert_failed_trace, insert_finalized_trace, insert_forward_trace, insert_returned_trace,
-    },
+    db::request_traces::insert_finalized_trace,
     models::{
         service_container_models::ServiceContainer, service_image_models::ServiceImage,
         service_route_model::ServiceRoute,
     },
-    utils::orchestrator_utils::{return_404, return_500, return_503, return_response},
+    utils::orchestrator_utils::{return_404, return_500, return_503},
 };
 
 pub async fn route_to_service_handler(
     request: Request,
-    tcp_stream: TcpStream,
+    tcp_stream: TlsStream<TcpStream>,
 ) -> Result<(), Box<dyn Error>> {
     let resolved_service: Result<(Option<ServiceRoute>, Option<ServiceImage>), String> =
         route_resolver(request.path.clone()).await;
@@ -209,7 +208,7 @@ pub async fn route_to_service_handler(
 
 pub async fn container_ready(
     request: Request,
-    mut tcp_stream: TcpStream,
+    mut tcp_stream: TlsStream<TcpStream>,
 ) -> Result<(), Box<dyn Error>> {
     let params = request.parameters;
     let uuid = params.get("uuid").unwrap();

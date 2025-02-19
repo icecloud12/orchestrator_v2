@@ -3,6 +3,7 @@ use http::StatusCode;
 use reqwest::Response;
 use std::sync::OnceLock;
 use tokio::{io::AsyncWriteExt, net::TcpStream};
+use tokio_rustls::server::TlsStream;
 use uuid::Uuid;
 
 use crate::db::orchestrator_instances::create_orchestrator_instance_query;
@@ -12,7 +13,7 @@ pub static ORCHESTRATOR_URI: OnceLock<String> = OnceLock::new();
 pub static ORCHESTRATOR_PUBLIC_UUID: OnceLock<Uuid> = OnceLock::new();
 pub static ORCHESTRATOR_INSTANCE_ID: OnceLock<i32> = OnceLock::new();
 
-pub async fn return_404(mut tcp_stream: TcpStream) {
+pub async fn return_404(mut tcp_stream: TlsStream<TcpStream>) {
     let body: Vec<u8> = Vec::new();
     let response_builder = http::Response::builder()
         .status(StatusCode::NOT_FOUND)
@@ -23,7 +24,7 @@ pub async fn return_404(mut tcp_stream: TcpStream) {
     let _flush_result = tcp_stream.flush().await;
 }
 
-pub async fn return_500(mut tcp_stream: TcpStream, message: String) {
+pub async fn return_500(mut tcp_stream: TlsStream<TcpStream>, message: String) {
     let body: Vec<u8> = message.as_bytes().to_vec();
     let response_builder = http::Response::builder()
         .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -34,7 +35,7 @@ pub async fn return_500(mut tcp_stream: TcpStream, message: String) {
     let _flush_result = tcp_stream.flush().await;
 }
 
-pub async fn return_503(mut tcp_stream: TcpStream) {
+pub async fn return_503(mut tcp_stream: TlsStream<TcpStream>) {
     let body: Vec<u8> = Vec::new();
     let response_builder = http::Response::builder()
         .status(StatusCode::SERVICE_UNAVAILABLE)
@@ -45,7 +46,7 @@ pub async fn return_503(mut tcp_stream: TcpStream) {
     let _flush_result = tcp_stream.flush().await;
 }
 
-pub async fn return_response(response: Response, mut tcp_stream: TcpStream) {
+pub async fn return_response(response: Response, mut tcp_stream: TlsStream<TcpStream>) {
     let mut response_builder = http::Response::builder()
         .status(response.status().as_u16())
         .version(response.version());

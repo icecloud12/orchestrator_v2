@@ -13,11 +13,11 @@ use utils::orchestrator_utils::{create_instance, ORCHESTRATOR_PUBLIC_UUID, ORCHE
 use utils::{docker_utils, postgres_utils};
 use uuid::Uuid;
 mod controllers;
+mod data;
 mod db;
 mod handlers;
 mod models;
 mod utils;
-mod data;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
