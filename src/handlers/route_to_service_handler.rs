@@ -85,6 +85,7 @@ pub async fn route_to_service_handler(
                             prefix,
                             exposed_port,
                             service_image,
+                            &service_route.https
                         )
                         .await
                         .unwrap();
@@ -102,6 +103,7 @@ pub async fn route_to_service_handler(
                                             service_request_uuid,
                                             Arc::new(container_id),
                                             &container_public_port,
+                                            &lb.https
                                         )
                                         .await;
                                         if !is_forward_success {
@@ -212,10 +214,9 @@ pub async fn container_ready(
 ) -> Result<(), Box<dyn Error>> {
     let params = request.parameters;
     let uuid = params.get("uuid").unwrap();
-    tracing::info!("recieved container uuid: {}", uuid);
+    tracing::info!("[INFO] Container ready with UUID: {}", uuid);
     let awaited_container_mutex = AWAITED_CONTAINERS.get().unwrap();
     let mut awaited_containers = awaited_container_mutex.lock().await;
-    println!("awaited containers {:#?}", awaited_containers);
     let load_balancer_key_option = awaited_containers.remove(uuid);
     drop(awaited_containers);
     if let Some(lb_key) = load_balancer_key_option {
@@ -266,6 +267,7 @@ pub async fn container_ready(
                             service_request_uuid,
                             Arc::new(container_id),
                             &container_port,
+                            &service_load_balancer.https
                         )
                         .await;
                         if !is_forward_success {

@@ -1,5 +1,5 @@
 use crate::utils::docker_utils::DOCKER;
-use bollard::{container::StartContainerOptions, errors::Error};
+use bollard::{container::{RemoveContainerOptions, StartContainerOptions}, errors::Error};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -37,8 +37,9 @@ impl ServiceContainer {
     }
     pub async fn delete_container(&self) ->Result<(), Error> {
         let docker = DOCKER.get().unwrap();
+        let remove_container_options : RemoveContainerOptions = RemoveContainerOptions {force: true , ..Default::default() };
         let delete_result = docker
-            .remove_container(&self.container_id, None).await;
+            .remove_container(&self.container_id, Some(remove_container_options)).await;
         delete_result
     }
 }

@@ -27,13 +27,13 @@ pub struct ServiceLoadBalancer {
     pub mode: ELoadBalancerMode,
     pub containers: Vec<ServiceContainer>, //docker_container_id_instances
     pub awaited_containers: HashMap<String, ServiceContainer>, //docker_containers not pushed to the active container vector
-    pub validated: bool, //initially false to let the program know if the containers are checke,
     pub request_queue: Vec<(Request, TlsStream<TcpStream>, Arc<Uuid>)>,
+    pub https: bool,
 }
 
 impl ServiceLoadBalancer {
 
-    pub async fn new(image_fk: Arc<i32>, docker_image_id: String, exposed_port: String, address:String) -> Result<ServiceLoadBalancer, String>{
+    pub async fn new(image_fk: Arc<i32>, docker_image_id: String, exposed_port: String, address:String, https: bool) -> Result<ServiceLoadBalancer, String>{
 
         let head: i32 = 0;
         let behavior: String = ELoadBalancerBehavior::RoundRobin.to_string();
@@ -44,8 +44,6 @@ impl ServiceLoadBalancer {
             Ok(rows) => {
                 //returns exactly 1 row
                 let id: i32 = rows[0].get::<&str,i32>("id");
-                
-                
                 let load_balancer = ServiceLoadBalancer{
                     id,
                     docker_image_id,
@@ -56,8 +54,8 @@ impl ServiceLoadBalancer {
                     mode: ELoadBalancerMode::QUEUE,
                     containers: vec![], 
                     awaited_containers: HashMap::new(),
-                    validated: false,
-                    request_queue: vec![]
+                    request_queue: vec![],
+                    https
                 };
                 Ok(load_balancer)
             }

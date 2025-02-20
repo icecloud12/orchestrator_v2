@@ -100,13 +100,13 @@ pub async fn prepare_port_allocation() -> Result<(i32, Arc<i32>, Uuid), Error> {
                     return Ok((cippj_id, Arc::new(allocated_port), generated_uuid));
                 }
                 Err(err) => {
-                    tracing::error!("get_port_pool error {}", err);
+                    tracing::error!("[ERROR] Port Pool Allocation Error {}", err);
                     return Err(err);
                 }
             }
         }
         Err(err) => {
-            tracing::error!("Failed to allocate port:  {}", err);
+            tracing::error!("[ERROR] Port Pool Allocation Error {}", err);
             return Err(err);
         }
     };
@@ -132,6 +132,5 @@ pub fn deallocate_port(cippj_ids: Vec<i32>) {
                 &[(&cippj_ids, Type::INT4_ARRAY)],
             )
             .await;
-        print!("{:#?}", _update_result);
     });
 }

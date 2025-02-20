@@ -102,6 +102,7 @@ pub async fn forward_request(
     request_uuid: Arc<Uuid>,
     container_id: Arc<i32>,
     container_port: &i32,
+    https: &bool,
 ) -> bool {
     insert_forward_trace(request_uuid.clone(), container_id.clone());
     //foward all queued stream to the newly made container
@@ -111,7 +112,13 @@ pub async fn forward_request(
         .danger_accept_invalid_certs(true)
         .build()
         .unwrap();
-    let url = format!("http://localhost:{}{}", &container_port, request.path);
+    let url = format!(
+        "{https}://localhost:{container_port}{request_path}",
+        https = if *https { "https" } else { "http" },
+        container_port = &container_port,
+        request_path = request.path
+    );
+
     let send_request_result = client
         .request(
             reqwest::Method::from_str(request.method.as_str()).unwrap(),

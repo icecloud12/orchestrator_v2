@@ -62,9 +62,9 @@ pub async fn get_load_balancer_with_containers_by_image_id(
     docker_image_id: String,
     exposed_port: String,
     address: String,
+    https: &bool,
 ) -> Result<ServiceLoadBalancer, String> {
     let load_balancer_query_results = get_existing_load_balancer_by_image(&image_fk).await;
-    println!("existing lb result {:#?}", load_balancer_query_results);
     match load_balancer_query_results {
         Ok(rows) => {
             let mut containers: Vec<ServiceContainer> = Vec::new();
@@ -104,14 +104,14 @@ pub async fn get_load_balancer_with_containers_by_image_id(
                     mode: ELoadBalancerMode::QUEUE,
                     containers,
                     awaited_containers: HashMap::new(),
-                    validated: false,
                     request_queue: Vec::new(),
+                    https: *https
                 };
                 Ok(service_load_balancer)
             } else {
                 //insert load_balancer here
                 let create_new_service_load_balancer =
-                    ServiceLoadBalancer::new(image_fk, docker_image_id, exposed_port, address)
+                    ServiceLoadBalancer::new(image_fk, docker_image_id, exposed_port, address, *https)
                         .await;
                 create_new_service_load_balancer
             }
@@ -131,6 +131,7 @@ pub async fn get_or_init_load_balancer(
     address: String,
     exposed_port: String,
     service_image: ServiceImage,
+    https: &bool
 ) -> Result<(DockerImageId, bool), String> {
     //get the image first
 
@@ -138,7 +139,7 @@ pub async fn get_or_init_load_balancer(
     let hm = LOADBALANCERS.get().unwrap().lock().await;
     match hm.get(&service_image.docker_image_id) {
         //we can only return the key to access the lb because it is owned by the mutex
-        Some(_service_load_balancer) => Ok((service_image.docker_image_id, false)), //returns an existing load-balance
+        Some(_service_load_balancer) => Ok((service_image.docker_image_id, false)), //returns an existing load-balancer
         None => {
             //
             drop(hm);
@@ -157,6 +158,7 @@ pub async fn get_or_init_load_balancer(
                     service_image.docker_image_id.clone(),
                     exposed_port,
                     address,
+                    https
                 )
                 .await;
             match load_balancer_query_result {

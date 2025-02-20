@@ -13,3 +13,12 @@ impl Display for ServiceImageColumns {
         }
     }
 }
+
+impl ServiceImageColumns {
+    pub fn as_str(&self) -> &str {
+        match *self {
+            Self::ID => "id",
+            Self::DOCKER_IMAGE_ID => "docker_image_id",
+        }
+    }
+}
