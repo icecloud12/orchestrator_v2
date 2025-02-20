@@ -1,7 +1,5 @@
 use super::{
-    orchestrators::OrchestratorColumns,
-    port_pool::{get_port_pool, PortPoolColumns},
-    tables::ETables,
+    containers::ServiceContainerColumns, orchestrators::OrchestratorColumns, port_pool::{get_port_pool, PortPoolColumns}, tables::ETables
 };
 use crate::utils::{orchestrator_utils::ORCHESTRATOR_PUBLIC_UUID, postgres_utils::POSTGRES_CLIENT};
 use std::{fmt::Display, sync::Arc};
@@ -133,4 +131,21 @@ pub fn deallocate_port(cippj_ids: Vec<i32>) {
             )
             .await;
     });
+}
+
+pub async fn deallocate_port_by_container_id (container_ids: Vec<String> ){
+    let client = POSTGRES_CLIENT.get().unwrap();
+    let _update_result = client.query_typed(
+        format!("
+                UPDATE {cippj_table} set {cippj_in_use} = false
+                WHERE {cippj_id} IN (SELECT {c_cippjfk} FROM {containers_table} WHERE {c_dci} = ANY($1)) 
+            ",
+            cippj_table = ETables::CONTAINER_INSTANCE_PORT_POOL_JUNCTION,
+            cippj_in_use = ContainerInstancePortPoolJunctionColumns::IN_USE,
+            cippj_id = ContainerInstancePortPoolJunctionColumns::ID,
+            c_cippjfk = ServiceContainerColumns::CONTAINER_INSTANCE_PORT_POOL_JUNCTION_FK,
+            containers_table = ETables::SERVICE_CONTAINER,
+            c_dci = ServiceContainerColumns::DOCKER_CONTAINER_ID
+        ).as_str()
+        , &[(&container_ids, Type::VARCHAR_ARRAY)]).await;
 }

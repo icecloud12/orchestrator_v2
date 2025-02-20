@@ -138,6 +138,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         docker_utils::connect();
         postgres_utils::connect(database_uri, database_user, database_pass, database_name).await;
+        docker_utils::deallocate_non_running().await;
         load_balancer_controller::init();
         let address: String = format!("https://{}:{}", &listening_address, &listening_port);
 
