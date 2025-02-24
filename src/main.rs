@@ -32,6 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let database_user;
         let database_pass;
         let database_name;
+        let database_port;
         let listening_address;
         let listening_port;
         let _prefix;
@@ -52,6 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     env::var("DEV_DATABASE_USER"),
                     env::var("DEV_DATABASE_PASS"),
                     env::var("DEV_DATABASE_NAME"),
+                    env::var("DEV_DATABASE_PORT"),
                     env::var("DEV_LISTENING_ADDRESS"),
                     env::var("DEV_LISTENING_PORT"),
                     env::var("ORCHESTRATOR_PUBLIC_UUID"),
@@ -61,6 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Ok(d_d_user),
                         Ok(d_d_pass),
                         Ok(d_d_name),
+                        Ok(d_d_port),
                         Ok(d_l_address),
                         Ok(d_l_port),
                         Ok(_orchestrator_public_uuid),
@@ -70,6 +73,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             database_user,
                             database_pass,
                             database_name,
+                            database_port,
                             listening_address,
                             listening_port,
                             orchestrator_public_uuid,
@@ -78,6 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             d_d_user,
                             d_d_pass,
                             d_d_name,
+                            d_d_port,
                             d_l_address,
                             d_l_port,
                             _orchestrator_public_uuid,
@@ -95,6 +100,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     env::var("PROD_DATABASE_USER"),
                     env::var("PROD_DATABASE_PASS"),
                     env::var("PROD_DATABASE_NAME"),
+                    env::var("PROD_DATABASE_PORT"),
                     env::var("PROD_LISTENING_ADDRESS"),
                     env::var("PROD_LISTENING_PORT"),
                     env::var("ORCHESTRATOR_PUBLIC_UUID"),
@@ -104,6 +110,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Ok(p_d_user),
                         Ok(p_d_pass),
                         Ok(p_d_name),
+                        Ok(p_d_port),
                         Ok(p_l_address),
                         Ok(p_l_port),
                         Ok(_orchestrator_public_uuid),
@@ -113,6 +120,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             database_user,
                             database_pass,
                             database_name,
+                            database_port,
                             listening_address,
                             listening_port,
                             orchestrator_public_uuid,
@@ -121,6 +129,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             p_d_user,
                             p_d_pass,
                             p_d_name,
+                            p_d_port,
                             p_l_address,
                             p_l_port,
                             _orchestrator_public_uuid,
@@ -137,7 +146,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         docker_utils::connect();
-        postgres_utils::connect(database_uri, database_user, database_pass, database_name).await;
+        postgres_utils::connect(
+            database_uri,
+            database_user,
+            database_pass,
+            database_name,
+            database_port,
+        )
+        .await;
         docker_utils::deallocate_non_running().await;
         load_balancer_controller::init();
         let address: String = format!("https://{}:{}", &listening_address, &listening_port);

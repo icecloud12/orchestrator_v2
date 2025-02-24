@@ -2,11 +2,17 @@ use std::sync::OnceLock;
 use tokio_postgres::{Client, NoTls};
 
 pub static POSTGRES_CLIENT: OnceLock<Client> = OnceLock::new();
-pub async fn connect(db_host: String, db_user: String, db_pass: String, db_name: String) {
+pub async fn connect(
+    db_host: String,
+    db_user: String,
+    db_pass: String,
+    db_name: String,
+    db_port: String,
+) {
     let (client, connection) = tokio_postgres::connect(
         format!(
-            "host={} user={} password={} dbname={}",
-            db_host, db_user, db_pass, db_name,
+            "host={} user={} password={} dbname={} port={}",
+            db_host, db_user, db_pass, db_name, db_port
         )
         .as_str(),
         NoTls,
