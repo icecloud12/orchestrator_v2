@@ -22,7 +22,7 @@ use crate::{
     models::service_container_models::ServiceContainer,
     utils::{
         docker_utils::DOCKER,
-        orchestrator_utils::{return_503, return_response, ORCHESTRATOR_URI},
+        orchestrator_utils::{return_503, return_response, ORCHESTRATOR_URI, REQWEST_CLIENT},
     },
 };
 
@@ -104,14 +104,11 @@ pub async fn forward_request(
     container_port: &i32,
     https: &bool,
 ) -> bool {
+    tracing::info!("inside forward_request");
     insert_forward_trace(request_uuid.clone(), container_id.clone());
-    //foward all queued stream to the newly made container
-    //todo NEED TO STORE THE REQUEST INFO AS WELL
-    let client_builder = reqwest::ClientBuilder::new();
-    let client = client_builder
-        .danger_accept_invalid_certs(true)
-        .build()
-        .unwrap();
+    tracing::info!("after forward trace | creating client_builder");
+    let client = REQWEST_CLIENT.get().unwrap();
+    tracing::info!("create url format");
     let url = format!(
         "{https}://localhost:{container_port}{request_path}",
         https = if *https { "https" } else { "http" },
@@ -119,6 +116,7 @@ pub async fn forward_request(
         request_path = request.path
     );
 
+    tracing::info!("forwarding");
     let send_request_result = client
         .request(
             reqwest::Method::from_str(request.method.as_str()).unwrap(),
@@ -128,12 +126,13 @@ pub async fn forward_request(
         .body(request.body)
         .send()
         .await;
+    tracing::info!("forwarded");
 
     match send_request_result {
         Ok(response) => {
-            insert_returned_trace(request_uuid.clone());
             let response_status = response.status().as_u16() as i32;
             return_response(response, tcp_stream).await;
+            insert_returned_trace(request_uuid.clone());
             insert_finalized_trace(request_uuid, response_status).await;
             return true;
         }

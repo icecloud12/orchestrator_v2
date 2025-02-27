@@ -33,7 +33,6 @@ impl Display for ERequestTracesColumns {
 pub async fn insert_request_acceptance_query(
     path: Arc<String>,
     method: Arc<String>,
-    image_fk: Arc<i32>,
     uuid: Arc<Uuid>,
 ) {
     let uuid_cloned = uuid.clone();
@@ -41,38 +40,36 @@ pub async fn insert_request_acceptance_query(
     // create the service request entry
     tokio::spawn(async move {
         let client = POSTGRES_CLIENT.get().unwrap();
-        let _insert_service_request_result = client
-            .query_typed(
-                format!(
-                    "
+        let future1 = tokio::task::spawn(async move {
+            let ret = client
+                .query_typed(
+                    format!(
+                        "
                 INSERT INTO {sr_table}
-                ({sr_path}, {sr_uuid}, {sr_method}, {sr_orchestrator_instance}, {sr_image_fk} )
+                ({sr_path}, {sr_uuid}, {sr_method}, {sr_orchestrator_instance})
                 VALUES ($1, $2, $3, $4, $5);
             ",
-                    sr_table = ETables::SERVICE_REQUEST,
-                    sr_path = EServiceRequestColumns::PATH,
-                    sr_uuid = EServiceRequestColumns::UUID,
-                    sr_method = EServiceRequestColumns::METHOD,
-                    sr_orchestrator_instance = EServiceRequestColumns::ORCHESTRATOR_INSTANCE_FK,
-                    sr_image_fk = EServiceRequestColumns::IMAGE_FK
+                        sr_table = ETables::SERVICE_REQUEST,
+                        sr_path = EServiceRequestColumns::PATH,
+                        sr_uuid = EServiceRequestColumns::UUID,
+                        sr_method = EServiceRequestColumns::METHOD,
+                        sr_orchestrator_instance = EServiceRequestColumns::ORCHESTRATOR_INSTANCE_FK,
+                    )
+                    .as_str(),
+                    &[
+                        (path.as_ref(), Type::TEXT),
+                        (uuid_cloned.as_ref(), Type::UUID),
+                        (method.as_ref(), Type::TEXT),
+                        (ORCHESTRATOR_INSTANCE_ID.get().unwrap(), Type::INT4),
+                    ],
                 )
-                .as_str(),
-                &[
-                    (path.as_ref(), Type::TEXT),
-                    (uuid_cloned.as_ref(), Type::UUID),
-                    (method.as_ref(), Type::TEXT),
-                    (ORCHESTRATOR_INSTANCE_ID.get().unwrap(), Type::INT4),
-                    (image_fk.as_ref(), Type::INT4),
-                ],
-            )
-            .await;
-        insert_request_trace(
-            uuid_cloned,
-            ERequestTraceTypes::INTERCEPTED as i32,
-            None,
-            dt,
-        )
-        .await;
+                .await;
+            ret
+        });
+        let future2 = tokio::task::spawn(async move {
+            insert_request_trace(uuid, ERequestTraceTypes::INTERCEPTED as i32, None, dt).await;
+        });
+        let (_ret1, _ret2) = tokio::join!(future1, future2);
     });
 }
 pub async fn insert_request_trace(
@@ -145,23 +142,23 @@ pub fn insert_forward_trace(request_uuid: Arc<Uuid>, container_id: Arc<i32>) {
             request_uuid,
             ERequestTraceTypes::FORWARDED as i32,
             Some(container_id.as_ref()),
-            dt
+            dt,
         )
         .await;
     });
 }
 
-pub fn insert_failed_trace(request_uuid: Arc<Uuid>){
+pub fn insert_failed_trace(request_uuid: Arc<Uuid>) {
     //create dt outside tokio spawn so it uses the time spawn is created and not when the spawn is executed
     let dt = Utc::now();
-    tokio::spawn(async move{
+    tokio::spawn(async move {
         insert_request_trace(request_uuid, ERequestTraceTypes::FAILED as i32, None, dt).await;
     });
 }
 
-pub fn insert_returned_trace(request_uuid: Arc<Uuid>){
+pub fn insert_returned_trace(request_uuid: Arc<Uuid>) {
     let dt = Utc::now();
-    tokio::spawn(async move{
-         insert_request_trace(request_uuid, ERequestTraceTypes::RETURNED as i32, None, dt).await;
+    tokio::spawn(async move {
+        insert_request_trace(request_uuid, ERequestTraceTypes::RETURNED as i32, None, dt).await;
     });
 }

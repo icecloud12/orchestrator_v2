@@ -28,8 +28,11 @@ pub async fn route_to_service_handler(
     request: Request,
     tcp_stream: TlsStream<TcpStream>,
 ) -> Result<(), Box<dyn Error>> {
+    tracing::info!("Intercepting request");
     let resolved_service: Result<(Option<ServiceRoute>, Option<ServiceImage>), String> =
         route_resolver(request.path.clone()).await;
+
+    tracing::info!("Resolved request");
     match resolved_service {
         Ok((service_route_option, service_image_option)) => {
             match (service_route_option, service_image_option) {
@@ -61,12 +64,9 @@ pub async fn route_to_service_handler(
                     let request_path = Arc::new(request.path.clone());
                     let request_method = Arc::new(request.method.clone());
 
-                    let service_request_uuid: Arc<Uuid> = record_service_request_acceptance(
-                        request_path,
-                        request_method,
-                        image_fk.clone(),
-                    )
-                    .await;
+                    tracing::info!("service_request_acceptance");
+                    let service_request_uuid: Arc<Uuid> =
+                        record_service_request_acceptance(request_path, request_method).await;
 
                     //queue_ing logic for await_load_balancers
                     let awaited_lb_hm = AWAITED_LOADBALANCERS.get().unwrap();
@@ -80,21 +80,27 @@ pub async fn route_to_service_handler(
                     } else {
                         drop(awaited_lb_lock);
                         //dropping the lock here because it is used on the next function
+                        tracing::info!("provisioning LB");
                         let (lb_key, new_lb) = get_or_init_load_balancer(
                             image_fk,
                             prefix,
                             exposed_port,
                             service_image,
-                            &service_route.https
+                            &service_route.https,
                         )
                         .await
                         .unwrap();
+                        tracing::info!("LB provisioned, acquiring lock");
+
                         let lb_mutex = LOADBALANCERS.get().unwrap();
                         let mut lb_hm = lb_mutex.lock().await;
                         let lb = lb_hm.get_mut(&lb_key).unwrap();
+                        tracing::info!("lock acquired");
                         match lb.mode {
                             ELoadBalancerMode::FORWARD => {
+                                tracing::info!("getting container");
                                 let next_container_result = lb.next_container().await;
+                                tracing::info!("container acquired");
                                 match next_container_result {
                                     Some((container_public_port, container_id)) => {
                                         let is_forward_success = forward_request(
@@ -103,7 +109,7 @@ pub async fn route_to_service_handler(
                                             service_request_uuid,
                                             Arc::new(container_id),
                                             &container_public_port,
-                                            &lb.https
+                                            &lb.https,
                                         )
                                         .await;
                                         if !is_forward_success {
@@ -267,7 +273,7 @@ pub async fn container_ready(
                             service_request_uuid,
                             Arc::new(container_id),
                             &container_port,
-                            &service_load_balancer.https
+                            &service_load_balancer.https,
                         )
                         .await;
                         if !is_forward_success {

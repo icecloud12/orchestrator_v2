@@ -99,20 +99,25 @@ pub async fn get_load_balancer_with_containers_by_image_id(
                     docker_image_id: docker_image_id.clone(),
                     exposed_port: exposed_port.clone(),
                     address: address.clone(),
-                    head: head.unwrap(),
+                    head: head.unwrap() as usize,
                     behavior: ELoadBalancerBehavior::RoundRobin,
                     mode: ELoadBalancerMode::QUEUE,
                     containers,
                     awaited_containers: HashMap::new(),
                     request_queue: Vec::new(),
-                    https: *https
+                    https: *https,
                 };
                 Ok(service_load_balancer)
             } else {
                 //insert load_balancer here
-                let create_new_service_load_balancer =
-                    ServiceLoadBalancer::new(image_fk, docker_image_id, exposed_port, address, *https)
-                        .await;
+                let create_new_service_load_balancer = ServiceLoadBalancer::new(
+                    image_fk,
+                    docker_image_id,
+                    exposed_port,
+                    address,
+                    *https,
+                )
+                .await;
                 create_new_service_load_balancer
             }
         }
@@ -131,7 +136,7 @@ pub async fn get_or_init_load_balancer(
     address: String,
     exposed_port: String,
     service_image: ServiceImage,
-    https: &bool
+    https: &bool,
 ) -> Result<(DockerImageId, bool), String> {
     //get the image first
 
@@ -158,7 +163,7 @@ pub async fn get_or_init_load_balancer(
                     service_image.docker_image_id.clone(),
                     exposed_port,
                     address,
-                    https
+                    https,
                 )
                 .await;
             match load_balancer_query_result {

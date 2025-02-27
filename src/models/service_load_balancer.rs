@@ -22,7 +22,7 @@ pub struct ServiceLoadBalancer {
     pub docker_image_id: String,
     pub exposed_port: String,
     pub address: String,
-    pub head: i32, //current head pointer of the load_balancer
+    pub head: usize, //current head pointer of the load_balancer
     pub behavior: ELoadBalancerBehavior,
     pub mode: ELoadBalancerMode,
     pub containers: Vec<ServiceContainer>, //docker_container_id_instances
@@ -69,21 +69,15 @@ impl ServiceLoadBalancer {
     pub async fn next_container(&mut self) -> Option<(i32,i32)> {
         let containers = &self.containers;
 
-        let container_len:i32 = containers.len() as i32;
+        let container_len = containers.len();
         let ret: Option<(i32, i32)> = if container_len == 0 {
-            // let create_container_result = self.create_container().await;
-            // //maybe create some logic before creating the container here for scalability logic
-            // match create_container_result {
-            //     Ok(container_port) => Ok(container_port),
-            //     Err(err) => Err(err),
-            // }
             None
         } else {
             //has container entries
             //move the head
             let head = &mut self.head;
             *head = (*head + 1) % container_len;
-            let container_ref = containers.get(*head as usize).unwrap();
+            let container_ref = containers.get(*head).unwrap();
             let public_port = container_ref.public_port.clone();
             let container_fk = container_ref.id.clone();
             Some((public_port, container_fk))
