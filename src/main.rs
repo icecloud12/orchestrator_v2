@@ -10,7 +10,9 @@ use handlers::route_to_service_handler::{container_ready, route_to_service_handl
 use std::env;
 use std::path::PathBuf;
 use tracing_subscriber;
-use utils::orchestrator_utils::{create_instance, ORCHESTRATOR_PUBLIC_UUID, ORCHESTRATOR_URI};
+use utils::orchestrator_utils::{
+    create_instance, RouterDecoration, ORCHESTRATOR_PUBLIC_UUID, ORCHESTRATOR_URI,
+};
 use utils::{docker_utils, postgres_utils};
 use uuid::Uuid;
 mod controllers;
@@ -184,7 +186,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .route("/*".to_string(), put(route_to_service_handler))
                         .route("/*".to_string(), trace(route_to_service_handler));
                     tracing::info!("now listening!");
-                    let bind_result = bind(
+                    let bind_result = bind::<RouterDecoration>(
                         router,
                         format!("{}:{}", &listening_address, &listening_port).as_str(),
                         PathBuf::from("./src/certs/cert.crt"),

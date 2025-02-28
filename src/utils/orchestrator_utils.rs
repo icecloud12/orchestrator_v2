@@ -1,3 +1,4 @@
+use bollard::Docker;
 use custom_tcp_listener::models::router::response_to_bytes;
 use http::StatusCode;
 use reqwest::{Client, Response};
@@ -13,6 +14,13 @@ pub static ORCHESTRATOR_URI: OnceLock<String> = OnceLock::new();
 pub static ORCHESTRATOR_PUBLIC_UUID: OnceLock<Uuid> = OnceLock::new();
 pub static ORCHESTRATOR_INSTANCE_ID: OnceLock<i32> = OnceLock::new();
 pub static REQWEST_CLIENT: OnceLock<Client> = OnceLock::new();
+pub struct RouterDecoration {
+    pub orchestrator_uri: String,
+    pub orchesttrator_uuid: Uuid,
+    pub orchestrator_instance_id: i32,
+    pub request_client: Client,
+    pub docker_connection: Docker,
+}
 pub async fn return_404(mut tcp_stream: TlsStream<TcpStream>) {
     let body: Vec<u8> = Vec::new();
     let response_builder = http::Response::builder()

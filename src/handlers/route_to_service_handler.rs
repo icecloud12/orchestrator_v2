@@ -21,12 +21,13 @@ use crate::{
         service_container_models::ServiceContainer, service_image_models::ServiceImage,
         service_route_model::ServiceRoute,
     },
-    utils::orchestrator_utils::{return_404, return_500, return_503},
+    utils::orchestrator_utils::{return_404, return_500, return_503, RouterDecoration},
 };
 
 pub async fn route_to_service_handler(
     request: Request,
     tcp_stream: TlsStream<TcpStream>,
+    router_decoration: Arc<RouterDecoration>,
 ) -> Result<(), Box<dyn Error>> {
     tracing::info!("Intercepting request");
     let resolved_service: Result<(Option<ServiceRoute>, Option<ServiceImage>), String> =
@@ -217,6 +218,7 @@ pub async fn route_to_service_handler(
 pub async fn container_ready(
     request: Request,
     mut tcp_stream: TlsStream<TcpStream>,
+    router_decoration: Arc<RouterDecoration>,
 ) -> Result<(), Box<dyn Error>> {
     let params = request.parameters;
     let uuid = params.get("uuid").unwrap();
