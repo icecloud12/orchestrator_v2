@@ -8,7 +8,7 @@ use crate::{
         service_container_models::{DockerImageId, ServiceContainer},
         service_image_models::ServiceImage,
         service_load_balancer::ServiceLoadBalancer,
-    },
+    }, utils::orchestrator_utils::RouterDecoration,
 };
 use custom_tcp_listener::models::types::Request;
 use std::{
@@ -63,8 +63,9 @@ pub async fn get_load_balancer_with_containers_by_image_id(
     exposed_port: String,
     address: String,
     https: &bool,
+    decoration: Arc<RouterDecoration>
 ) -> Result<ServiceLoadBalancer, String> {
-    let load_balancer_query_results = get_existing_load_balancer_by_image(&image_fk).await;
+    let load_balancer_query_results = get_existing_load_balancer_by_image(&image_fk, &decoration.postgres_client).await;
     match load_balancer_query_results {
         Ok(rows) => {
             let mut containers: Vec<ServiceContainer> = Vec::new();
@@ -106,6 +107,7 @@ pub async fn get_load_balancer_with_containers_by_image_id(
                     awaited_containers: HashMap::new(),
                     request_queue: Vec::new(),
                     https: *https,
+                    decoration
                 };
                 Ok(service_load_balancer)
             } else {
@@ -116,6 +118,7 @@ pub async fn get_load_balancer_with_containers_by_image_id(
                     exposed_port,
                     address,
                     *https,
+                    decoration
                 )
                 .await;
                 create_new_service_load_balancer
@@ -137,6 +140,7 @@ pub async fn get_or_init_load_balancer(
     exposed_port: String,
     service_image: ServiceImage,
     https: &bool,
+    decoration: Arc<RouterDecoration>
 ) -> Result<(DockerImageId, bool), String> {
     //get the image first
 
@@ -164,6 +168,7 @@ pub async fn get_or_init_load_balancer(
                     exposed_port,
                     address,
                     https,
+                    decoration.clone()
                 )
                 .await;
             match load_balancer_query_result {
@@ -207,7 +212,7 @@ pub async fn get_or_init_load_balancer(
                                         lb.docker_image_id.clone(),
                                     );
                                     let start_container_result =
-                                        any_entry.1.start_container().await;
+                                        any_entry.1.start_container(decoration.docker_connection.clone()).await;
                                     let result = match start_container_result {
                                         Ok(_) => {
                                             drop(awaited_container_lock);

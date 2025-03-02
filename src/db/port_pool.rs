@@ -1,8 +1,9 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
 
 use tokio_postgres::{types::Type, Error, Row};
 
-use crate::utils::postgres_utils::POSTGRES_CLIENT;
+
+use crate::utils::postgres_utils;
 
 use super::{
     container_instance_port_pool_junction::ContainerInstancePortPoolJunctionColumns, tables::ETables,
@@ -33,10 +34,8 @@ impl PortPoolColumns {
         }
     }
 }
-pub async fn get_port_pool(ppp_id: &i32) -> Result<Vec<Row>, Error> {
-    let client = POSTGRES_CLIENT.get().unwrap();
-    let select_result = client
-        .query_typed(
+pub async fn get_port_pool(ppp_id: &i32, postgres_client: &tokio_postgres::Client) -> Result<Vec<Row>, Error> {
+        let select_result = postgres_client.query_typed(
             format!(
                 "
         SELECT pp.{pp_port} as pp_port, cippj.{cippj_id} as cippj_id

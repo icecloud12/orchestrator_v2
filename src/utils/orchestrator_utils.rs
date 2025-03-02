@@ -1,8 +1,8 @@
 use bollard::Docker;
 use custom_tcp_listener::models::router::response_to_bytes;
 use http::StatusCode;
-use reqwest::{Client, Response};
-use std::sync::OnceLock;
+use reqwest::Response;
+use std::sync::{Arc, OnceLock};
 use tokio::{io::AsyncWriteExt, net::TcpStream};
 use tokio_rustls::server::TlsStream;
 use uuid::Uuid;
@@ -10,16 +10,16 @@ use uuid::Uuid;
 use crate::db::orchestrator_instances::create_orchestrator_instance_query;
 use crate::db::orchestrators::OrchestratorColumns;
 
-pub static ORCHESTRATOR_URI: OnceLock<String> = OnceLock::new();
 pub static ORCHESTRATOR_PUBLIC_UUID: OnceLock<Uuid> = OnceLock::new();
 pub static ORCHESTRATOR_INSTANCE_ID: OnceLock<i32> = OnceLock::new();
-pub static REQWEST_CLIENT: OnceLock<Client> = OnceLock::new();
+#[derive(Debug)]
 pub struct RouterDecoration {
-    pub orchestrator_uri: String,
-    pub orchesttrator_uuid: Uuid,
-    pub orchestrator_instance_id: i32,
-    pub request_client: Client,
-    pub docker_connection: Docker,
+    pub docker_connection: Arc<Docker>,
+    pub orchestrator_instance_id: Arc<i32>,
+    pub orchestrator_uri: Arc<String>,
+    pub orchestrator_uuid: Arc<Uuid>,
+    pub postgres_client: Arc<tokio_postgres::Client>,
+    pub reqwest_client: Arc<reqwest::Client>,
 }
 pub async fn return_404(mut tcp_stream: TlsStream<TcpStream>) {
     let body: Vec<u8> = Vec::new();
@@ -84,8 +84,8 @@ pub async fn return_response(response: Response, mut tcp_stream: TlsStream<TcpSt
     tracing::info!("flushed");
 }
 
-pub async fn create_instance() -> bool {
-    let insert_result = create_orchestrator_instance_query().await;
+pub async fn create_instance(postgres_client: &tokio_postgres::Client) -> Option<reqwest::Client> {
+    let insert_result = create_orchestrator_instance_query(postgres_client).await;
     match insert_result {
         Ok(rows) => {
             //we assert there is only 1 result
@@ -98,13 +98,12 @@ pub async fn create_instance() -> bool {
                 .danger_accept_invalid_certs(true)
                 .build()
                 .unwrap();
-            REQWEST_CLIENT.get_or_init(|| client);
-            true
+            Some(client)
         }
         Err(err) => {
             let error = err.to_string();
             tracing::warn!(error);
-            false
+            None
         }
     }
 }

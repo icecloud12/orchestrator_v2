@@ -2,8 +2,6 @@ use std::fmt::Display;
 
 use tokio_postgres::{types::Type, Error, Row};
 
-use crate::utils::postgres_utils::POSTGRES_CLIENT;
-
 use super::{
     container_instance_port_pool_junction::ContainerInstancePortPoolJunctionColumns,
     containers::ServiceContainerColumns,
@@ -28,9 +26,11 @@ impl Display for ServiceLoadBalancersColumns {
     }
 }
 
-pub async fn get_existing_load_balancer_by_image(image_fk: &i32) -> Result<Vec<Row>, Error> {
-    let client = POSTGRES_CLIENT.get().unwrap();
-    client
+pub async fn get_existing_load_balancer_by_image(
+    image_fk: &i32,
+    postgres_client: &tokio_postgres::Client,
+) -> Result<Vec<Row>, Error> {
+    postgres_client
         .query_typed(
             format!(
                 "

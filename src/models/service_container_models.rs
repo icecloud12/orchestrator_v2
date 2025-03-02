@@ -1,5 +1,6 @@
-use crate::utils::docker_utils::DOCKER;
-use bollard::{container::{RemoveContainerOptions, StartContainerOptions}, errors::Error};
+use std::sync::Arc;
+
+use bollard::{container::{RemoveContainerOptions, StartContainerOptions}, errors::Error, Docker};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -25,8 +26,7 @@ pub struct ServiceContainerBody {
 pub type DockerImageId = String;
 
 impl ServiceContainer {
-    pub async fn start_container(&self) -> Result<(), String> {
-        let docker = DOCKER.get().unwrap();
+    pub async fn start_container(&self, docker: Arc<Docker>) -> Result<(), String> {
         let start_result = docker
             .start_container(&self.container_id, None::<StartContainerOptions<String>>)
             .await;
@@ -35,8 +35,7 @@ impl ServiceContainer {
             Err(err) => Err(err.to_string()),
         }
     }
-    pub async fn delete_container(&self) ->Result<(), Error> {
-        let docker = DOCKER.get().unwrap();
+    pub async fn delete_container(&self, docker: Arc<Docker>) ->Result<(), Error> {
         let remove_container_options : RemoveContainerOptions = RemoveContainerOptions {force: true , ..Default::default() };
         let delete_result = docker
             .remove_container(&self.container_id, Some(remove_container_options)).await;

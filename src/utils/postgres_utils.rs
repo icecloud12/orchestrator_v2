@@ -1,14 +1,14 @@
-use std::sync::OnceLock;
+use std::sync::Arc;
+
 use tokio_postgres::{Client, NoTls};
 
-pub static POSTGRES_CLIENT: OnceLock<Client> = OnceLock::new();
 pub async fn connect(
     db_host: String,
     db_user: String,
     db_pass: String,
     db_name: String,
     db_port: String,
-) {
+)-> Arc<Client> {
     let (client, connection) = tokio_postgres::connect(
         format!(
             "host={} user={} password={} dbname={} port={}",
@@ -25,5 +25,5 @@ pub async fn connect(
         }
     });
     //it's ok for it to crash since it is still on initialization phase and is a requirement
-    POSTGRES_CLIENT.get_or_init(|| client);
+    Arc::new(client)
 }

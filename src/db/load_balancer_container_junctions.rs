@@ -1,6 +1,5 @@
 use tokio_postgres::types::Type;
 
-use crate::utils::postgres_utils::POSTGRES_CLIENT;
 use std::{fmt::Display, sync::Arc};
 
 use super::tables::ETables;
@@ -21,10 +20,9 @@ impl Display for ELoadBalancerContainerJunctionColumns {
 }
 
 
-pub fn insert_lbcj(load_balancer_id: Arc<i32>, container_id: Arc<i32>) {
+pub fn insert_lbcj(load_balancer_id: Arc<i32>, container_id: Arc<i32>, postgres_client: Arc<tokio_postgres::Client>) {
     tokio::spawn(async move {
-        let client = POSTGRES_CLIENT.get().unwrap();
-        let _ = client
+        let _ = postgres_client
             .query_typed(
                 format!(
                     "INSERT INTO {lbcj_table} ({lbcj_lbfk}, {lbcj_cfk})

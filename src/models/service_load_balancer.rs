@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::{
     controllers::{
         container_controller, load_balancer_container_junction_controller, load_balancer_controller::{ELoadBalancerBehavior, ELoadBalancerMode, AWAITED_CONTAINERS}
-    }, db::container_instance_port_pool_junction::deallocate_port, utils::{docker_utils::DOCKER, postgres_utils::POSTGRES_CLIENT}
+    }, db::container_instance_port_pool_junction::deallocate_port, utils::orchestrator_utils::RouterDecoration
 };
 
 use super::service_container_models::ServiceContainer;
@@ -29,15 +29,16 @@ pub struct ServiceLoadBalancer {
     pub awaited_containers: HashMap<String, ServiceContainer>, //docker_containers not pushed to the active container vector
     pub request_queue: Vec<(Request, TlsStream<TcpStream>, Arc<Uuid>)>,
     pub https: bool,
+    pub decoration: Arc<RouterDecoration>
 }
 
 impl ServiceLoadBalancer {
 
-    pub async fn new(image_fk: Arc<i32>, docker_image_id: String, exposed_port: String, address:String, https: bool) -> Result<ServiceLoadBalancer, String>{
+    pub async fn new(image_fk: Arc<i32>, docker_image_id: String, exposed_port: String, address:String, https: bool, decoration: Arc<RouterDecoration>) -> Result<ServiceLoadBalancer, String>{
 
         let head: i32 = 0;
         let behavior: String = ELoadBalancerBehavior::RoundRobin.to_string();
-        let insert_result = POSTGRES_CLIENT.get().unwrap().query_typed("INSERT INTO load_balancers (image_fk, head, behavior) VALUES ($1, $2, $3) RETURNING id", &[(image_fk.as_ref(), Type::INT4), 
+        let insert_result = decoration.postgres_client.query_typed("INSERT INTO load_balancers (image_fk, head, behavior) VALUES ($1, $2, $3) RETURNING id", &[(image_fk.as_ref(), Type::INT4), 
             (&head, Type::INT4), 
             (&behavior, Type::TEXT)]).await;
         match insert_result {
@@ -55,7 +56,8 @@ impl ServiceLoadBalancer {
                     containers: vec![], 
                     awaited_containers: HashMap::new(),
                     request_queue: vec![],
-                    https
+                    https,
+                    decoration
                 };
                 Ok(load_balancer)
             }
@@ -87,12 +89,12 @@ impl ServiceLoadBalancer {
 
     pub async fn create_container(&mut self) -> Result<ServiceContainer, String> {
         let col =
-            container_controller::create_container(&self.docker_image_id, &self.exposed_port).await;
+            container_controller::create_container(&self.docker_image_id, &self.exposed_port, self.decoration.docker_connection.clone(), self.decoration.postgres_client.clone(), &self.decoration.orchestrator_uri.as_ref()).await;
 
         match col {
             Ok(service_container) => {
                 // it is ok that it fails but if that was the case then the container is non-trackable
-                load_balancer_container_junction_controller::create(Arc::new(self.id), Arc::new(service_container.id));
+                load_balancer_container_junction_controller::create(Arc::new(self.id), Arc::new(service_container.id), self.decoration.postgres_client.clone());
                 Ok(service_container)
             }
             Err(err) => Err(err),
@@ -113,8 +115,8 @@ impl ServiceLoadBalancer {
         if index.is_some() {
             tracing::info!("[INFO] Dropping Container");
             let container = containers.remove(index.unwrap());
-            deallocate_port(vec![container.cippj_fk]);// free port usage
-            let _delete_container_result = container.delete_container().await;
+            deallocate_port(vec![container.cippj_fk], self.decoration.postgres_client.clone());// free port usage
+            let _delete_container_result = container.delete_container(self.decoration.docker_connection.clone()).await;
             Some(container)
         }else{
             None
@@ -147,7 +149,7 @@ impl ServiceLoadBalancer {
             filters,
             ..Default::default()
         };
-        let docker = DOCKER.get().unwrap();
+        let docker = &self.decoration.docker_connection;
         let container_list_result = match docker.list_containers(Some(options)).await {
             Ok(container_list) => {
                 // let mut await_container_lock = AWAITED_CONTAINERS.get().unwrap().lock().await;
@@ -169,7 +171,7 @@ impl ServiceLoadBalancer {
                     let deallocate_ids_buffer: Vec<i32> = container_map.into_iter().map(|(_key, value)| {
                          return value.cippj_fk;
                     }).collect();
-                    deallocate_port(deallocate_ids_buffer);
+                    deallocate_port(deallocate_ids_buffer,self.decoration.postgres_client.clone());
                     return Ok(());
                 }
                 

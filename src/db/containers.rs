@@ -1,7 +1,6 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
 use tokio_postgres::{types::Type, Error, Row};
 
-use crate::utils::postgres_utils::POSTGRES_CLIENT;
 
 use super::tables::ETables;
 
@@ -37,8 +36,9 @@ impl ServiceContainerColumns {
 pub async fn container_insert_query(
     docker_container_id: &String,
     cippj_id: &i32,
+    postgres_client: Arc<tokio_postgres::Client>
 ) -> Result<Vec<Row>, Error> {
-    let client = POSTGRES_CLIENT.get().unwrap();
+    let client = postgres_client;
     let insert_result = client
         .query_typed(
             format!(

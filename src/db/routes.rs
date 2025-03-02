@@ -1,8 +1,7 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
 
 use tokio_postgres::{types::Type, Error, Row};
 
-use crate::utils::postgres_utils::POSTGRES_CLIENT;
 
 pub enum ServiceRouteColumns {
     ID,
@@ -26,8 +25,9 @@ impl Display for ServiceRouteColumns {
     }
 }
 
-pub async fn route_resolution_query(uri_string: String) -> Result<Vec<Row>, Error> {
-    let route_result = POSTGRES_CLIENT.get().unwrap().query_typed(
+pub async fn route_resolution_query(uri_string: String, postgres_client: Arc<tokio_postgres::Client>) -> Result<Vec<Row>, Error> {
+    
+    let route_result = postgres_client.query_typed(
             "SELECT r.id as r_id, image_fk, prefix, exposed_port, exposed_port, segments, img.docker_image_id, r.https  FROM routes r LEFT JOIN images img on r.image_fk = img.id where $1 LIKE prefix || '%' ORDER BY segments DESC LIMIT 1",
             &[(&uri_string, Type::TEXT)]
     ).await;

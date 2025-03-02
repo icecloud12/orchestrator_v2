@@ -1,7 +1,4 @@
-use crate::{
-    data::request_traces_types::ERequestTraceTypes,
-    utils::{orchestrator_utils::ORCHESTRATOR_INSTANCE_ID, postgres_utils::POSTGRES_CLIENT},
-};
+use crate::data::request_traces_types::ERequestTraceTypes;
 use chrono::{DateTime, Utc};
 use std::{fmt::Display, sync::Arc};
 use tokio_postgres::types::Type;
@@ -34,14 +31,16 @@ pub async fn insert_request_acceptance_query(
     path: Arc<String>,
     method: Arc<String>,
     uuid: Arc<Uuid>,
+    postgres_client: Arc<tokio_postgres::Client>,
+    orchestrator_instance_id: Arc<i32>,
 ) {
     let uuid_cloned = uuid.clone();
     let dt = Utc::now();
+    let postgres_client_clone = postgres_client.clone();
     // create the service request entry
     tokio::spawn(async move {
-        let client = POSTGRES_CLIENT.get().unwrap();
         let future1 = tokio::task::spawn(async move {
-            let ret = client
+            let ret = postgres_client
                 .query_typed(
                     format!(
                         "
@@ -60,14 +59,21 @@ pub async fn insert_request_acceptance_query(
                         (path.as_ref(), Type::TEXT),
                         (uuid_cloned.as_ref(), Type::UUID),
                         (method.as_ref(), Type::TEXT),
-                        (ORCHESTRATOR_INSTANCE_ID.get().unwrap(), Type::INT4),
+                        (orchestrator_instance_id.as_ref(), Type::INT4),
                     ],
                 )
                 .await;
             ret
         });
         let future2 = tokio::task::spawn(async move {
-            insert_request_trace(uuid, ERequestTraceTypes::INTERCEPTED as i32, None, dt).await;
+            insert_request_trace(
+                uuid,
+                ERequestTraceTypes::INTERCEPTED as i32,
+                None,
+                dt,
+                postgres_client_clone,
+            )
+            .await;
         });
         let (_ret1, _ret2) = tokio::join!(future1, future2);
     });
@@ -77,9 +83,9 @@ pub async fn insert_request_trace(
     request_trace_type_fk: i32,
     container_id_fk: Option<&i32>,
     timestamp: DateTime<Utc>,
+    postgres_client: Arc<tokio_postgres::Client>,
 ) {
-    let client = POSTGRES_CLIENT.get().unwrap();
-    let _insert_request_trace_result = client
+    let _insert_request_trace_result = postgres_client
         .query_typed(
             format!(
                 "
@@ -108,12 +114,15 @@ pub async fn insert_request_trace(
 }
 ///
 /// This function is called at the end of the request trace so no need to create a task for it to query independently
-pub async fn insert_finalized_trace(request_uuid: Arc<Uuid>, status_code: i32) {
-    let client = POSTGRES_CLIENT.get().unwrap();
+pub async fn insert_finalized_trace(
+    request_uuid: Arc<Uuid>,
+    status_code: i32,
+    postgres_client: Arc<tokio_postgres::Client>,
+) {
     let dt = Utc::now();
     //update service request table
     //there is nothing we can do if it fails
-    let _update_query = client
+    let _update_query = postgres_client
         .query_typed(
             format!(
                 "
@@ -132,10 +141,17 @@ pub async fn insert_finalized_trace(request_uuid: Arc<Uuid>, status_code: i32) {
             ],
         )
         .await;
-    insert_request_trace(request_uuid, ERequestTraceTypes::FINALIZED as i32, None, dt).await;
+    insert_request_trace(
+        request_uuid,
+        ERequestTraceTypes::FINALIZED as i32,
+        None,
+        dt,
+        postgres_client,
+    )
+    .await;
 }
 
-pub fn insert_forward_trace(request_uuid: Arc<Uuid>, container_id: Arc<i32>) {
+pub fn insert_forward_trace(request_uuid: Arc<Uuid>, container_id: Arc<i32>, postgres_client: Arc<tokio_postgres::Client>) {
     let dt = Utc::now();
     tokio::spawn(async move {
         insert_request_trace(
@@ -143,22 +159,23 @@ pub fn insert_forward_trace(request_uuid: Arc<Uuid>, container_id: Arc<i32>) {
             ERequestTraceTypes::FORWARDED as i32,
             Some(container_id.as_ref()),
             dt,
+            postgres_client
         )
         .await;
     });
 }
 
-pub fn insert_failed_trace(request_uuid: Arc<Uuid>) {
+pub fn insert_failed_trace(request_uuid: Arc<Uuid>, postgres_client: Arc<tokio_postgres::Client>) {
     //create dt outside tokio spawn so it uses the time spawn is created and not when the spawn is executed
     let dt = Utc::now();
     tokio::spawn(async move {
-        insert_request_trace(request_uuid, ERequestTraceTypes::FAILED as i32, None, dt).await;
+        insert_request_trace(request_uuid, ERequestTraceTypes::FAILED as i32, None, dt, postgres_client).await;
     });
 }
 
-pub fn insert_returned_trace(request_uuid: Arc<Uuid>) {
+pub fn insert_returned_trace(request_uuid: Arc<Uuid>, postgres_client: Arc<tokio_postgres::Client>) {
     let dt = Utc::now();
     tokio::spawn(async move {
-        insert_request_trace(request_uuid, ERequestTraceTypes::RETURNED as i32, None, dt).await;
+        insert_request_trace(request_uuid, ERequestTraceTypes::RETURNED as i32, None, dt, postgres_client).await;
     });
 }

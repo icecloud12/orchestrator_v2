@@ -9,10 +9,9 @@ use dotenv::dotenv;
 use handlers::route_to_service_handler::{container_ready, route_to_service_handler};
 use std::env;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tracing_subscriber;
-use utils::orchestrator_utils::{
-    create_instance, RouterDecoration, ORCHESTRATOR_PUBLIC_UUID, ORCHESTRATOR_URI,
-};
+use utils::orchestrator_utils::{create_instance, RouterDecoration, ORCHESTRATOR_PUBLIC_UUID};
 use utils::{docker_utils, postgres_utils};
 use uuid::Uuid;
 mod controllers;
@@ -147,8 +146,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
-        docker_utils::connect();
-        postgres_utils::connect(
+        let docker = docker_utils::connect();
+        let postgres_client = postgres_utils::connect(
             database_uri,
             database_user,
             database_pass,
@@ -156,20 +155,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             database_port,
         )
         .await;
-        docker_utils::deallocate_non_running().await;
-        load_balancer_controller::init();
-        let address: String = format!("https://{}:{}", &listening_address, &listening_port);
 
-        ORCHESTRATOR_URI.get_or_init(|| address);
+        docker_utils::deallocate_non_running(docker.clone(), postgres_client.clone()).await;
+        load_balancer_controller::init();
+        let orchestrator_uri: String = format!("https://{}:{}", &listening_address, &listening_port);
+
         let uuid_parse_result = Uuid::parse_str(orchestrator_public_uuid.as_str());
         match uuid_parse_result {
             Ok(uuid_parsed) => {
                 ORCHESTRATOR_PUBLIC_UUID.get_or_init(|| uuid_parsed);
-                let instance_result = create_instance().await;
+                let instance_result: Option<reqwest::Client> =
+                    create_instance(&postgres_client).await;
                 // ORCHESTRATOR_PUBLIC_UUID.get_or_init(|| );
                 //there is no way shape or form this would miss
                 // let mut rx: Receiver<SenderParameter> = request_channel_init();
-                if instance_result {
+                if instance_result.is_some() {
+                    let reqwest_client = instance_result.unwrap();
                     tracing::info!("Loading orchestrator routes");
                     let router = Router::new()
                         .route(

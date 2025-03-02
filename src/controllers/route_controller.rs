@@ -7,8 +7,9 @@ use crate::{
 
 pub async fn route_resolver(
     uri_string: String,
+    postgres_client: Arc<tokio_postgres::Client>
 ) -> Result<(Option<ServiceRoute>, Option<ServiceImage>), String> {
-    let route_result = route_resolution_query(uri_string).await;
+    let route_result = route_resolution_query(uri_string, postgres_client).await;
     match route_result {
         Ok(rows) => {
             let service_route: (Option<ServiceRoute>, Option<ServiceImage>) = if !rows.is_empty() {

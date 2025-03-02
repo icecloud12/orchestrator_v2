@@ -1,33 +1,26 @@
-use std::{
-    collections::HashMap,
-    process::exit,
-    str::FromStr,
-    sync::{Arc, OnceLock},
-};
+use std::{collections::HashMap, process::exit, sync::Arc};
 
 use bollard::{
     container::{ListContainersOptions, RemoveContainerOptions},
-    secret::{ContainerStateStatusEnum, ContainerStatus},
+    secret::ContainerStateStatusEnum,
     Docker,
 };
-use uuid::Uuid;
 
 use crate::db::container_instance_port_pool_junction::deallocate_port_by_container_id;
 
 use super::orchestrator_utils::RouterDecoration;
 
-pub fn connect() {
+pub fn connect() -> Arc<Docker>{
     match Docker::connect_with_local_defaults() {
-        Ok(docker_connection) => docker_connection,
+        Ok(docker_connection) => Arc::new(docker_connection),
         Err(err) => {
             println!("{}", err);
             exit(0x0100)
         }
-    };
+    }
 }
-pub async fn deallocate_non_running(route_decoration: Arc<RouterDecoration>) {
-    let decoration = route_decoration.as_ref();
-    let docker = &decoration.docker_connection;
+pub async fn deallocate_non_running(docker: Arc<Docker>, postgres_client: Arc<tokio_postgres::Client>) {
+    
     let mut filters = HashMap::new();
     let container_status_filter = vec![
         ContainerStateStatusEnum::CREATED.to_string(),
@@ -53,7 +46,9 @@ pub async fn deallocate_non_running(route_decoration: Arc<RouterDecoration>) {
                 .map(|cs| {
                     let container_id = cs.id.unwrap();
                     let cs_id = container_id.clone();
+                    let arc_docker_clone = docker.clone();
                     tokio::spawn(async move {
+                        let docker = arc_docker_clone.as_ref();
                         let c_id = cs_id;
                         let options = RemoveContainerOptions {
                             force: true,
@@ -71,7 +66,7 @@ pub async fn deallocate_non_running(route_decoration: Arc<RouterDecoration>) {
                     container_id
                 })
                 .collect::<Vec<String>>();
-            deallocate_port_by_container_id(force_stop_container_list).await;
+            deallocate_port_by_container_id(force_stop_container_list, postgres_client).await;
         }
         Err(err) => {
             tracing::error!("[ERROR]: {:#?}", err);
