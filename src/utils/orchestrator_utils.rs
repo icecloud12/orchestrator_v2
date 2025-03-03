@@ -10,14 +10,12 @@ use uuid::Uuid;
 use crate::db::orchestrator_instances::create_orchestrator_instance_query;
 use crate::db::orchestrators::OrchestratorColumns;
 
-pub static ORCHESTRATOR_PUBLIC_UUID: OnceLock<Uuid> = OnceLock::new();
-pub static ORCHESTRATOR_INSTANCE_ID: OnceLock<i32> = OnceLock::new();
 #[derive(Debug)]
 pub struct RouterDecoration {
     pub docker_connection: Arc<Docker>,
     pub orchestrator_instance_id: Arc<i32>,
     pub orchestrator_uri: Arc<String>,
-    pub orchestrator_uuid: Arc<Uuid>,
+    pub orchestrator_public_uuid: Arc<Uuid>,
     pub postgres_client: Arc<tokio_postgres::Client>,
     pub reqwest_client: Arc<reqwest::Client>,
 }
@@ -84,21 +82,24 @@ pub async fn return_response(response: Response, mut tcp_stream: TlsStream<TcpSt
     tracing::info!("flushed");
 }
 
-pub async fn create_instance(postgres_client: &tokio_postgres::Client) -> Option<reqwest::Client> {
-    let insert_result = create_orchestrator_instance_query(postgres_client).await;
+pub async fn create_instance(
+    postgres_client: &tokio_postgres::Client,
+    orchestrator_public_uuid: &Uuid,
+) -> Option<(Arc<reqwest::Client>, Arc<i32>)> {
+    let insert_result =
+        create_orchestrator_instance_query(postgres_client, orchestrator_public_uuid).await;
     match insert_result {
         Ok(rows) => {
             //we assert there is only 1 result
             let row = &rows[0];
             let orchestrator_instance_id =
                 row.get::<&str, i32>(OrchestratorColumns::ID.to_string().as_str());
-            ORCHESTRATOR_INSTANCE_ID.get_or_init(|| orchestrator_instance_id);
             let client_builder = reqwest::ClientBuilder::new();
             let client = client_builder
                 .danger_accept_invalid_certs(true)
                 .build()
                 .unwrap();
-            Some(client)
+            Some((Arc::new(client), Arc::new(orchestrator_instance_id)))
         }
         Err(err) => {
             let error = err.to_string();

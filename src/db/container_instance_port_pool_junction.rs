@@ -1,9 +1,11 @@
 use super::{
-    containers::ServiceContainerColumns, orchestrators::OrchestratorColumns, port_pool::{get_port_pool, PortPoolColumns}, tables::ETables
+    containers::ServiceContainerColumns,
+    orchestrators::OrchestratorColumns,
+    port_pool::{get_port_pool, PortPoolColumns},
+    tables::ETables,
 };
-use crate::utils::orchestrator_utils::ORCHESTRATOR_PUBLIC_UUID;
 use std::{fmt::Display, sync::Arc};
-use tokio_postgres::{types::Type, Error, GenericClient, Row};
+use tokio_postgres::{types::Type, Error, Row};
 use uuid::Uuid;
 
 pub enum ContainerInstancePortPoolJunctionColumns {
@@ -34,7 +36,10 @@ impl ContainerInstancePortPoolJunctionColumns {
     }
 }
 
-pub async fn allocate_port(postgres_client: &tokio_postgres::Client) -> Result<Vec<Row>, Error> {
+pub async fn allocate_port(
+    postgres_client: &tokio_postgres::Client,
+    orchestrator_public_uuid: &Uuid,
+) -> Result<Vec<Row>, Error> {
     let insert_result = postgres_client
         .query_typed(
             format!(
@@ -68,16 +73,19 @@ pub async fn allocate_port(postgres_client: &tokio_postgres::Client) -> Result<V
                 o_table_pub_uuid = OrchestratorColumns::PUBLIC_UUID,
             )
             .as_str(),
-            &[(ORCHESTRATOR_PUBLIC_UUID.get().unwrap(), Type::UUID)],
+            &[(orchestrator_public_uuid, Type::UUID)],
         )
         .await;
     insert_result
 }
 
 /// A function call to prepare a port and Uuid for container creation
-pub async fn prepare_port_allocation(postgres_client: Arc<tokio_postgres::Client>) -> Result<(i32, Arc<i32>, Uuid), Error> {
+pub async fn prepare_port_allocation(
+    postgres_client: Arc<tokio_postgres::Client>,
+    orchestrator_public_uuid: &Uuid,
+) -> Result<(i32, Arc<i32>, Uuid), Error> {
     //allocate a port if available
-    let allocate_result = allocate_port(postgres_client.as_ref()).await;
+    let allocate_result = allocate_port(postgres_client.as_ref(), &orchestrator_public_uuid).await;
     match allocate_result {
         Ok(rows) => {
             let row = &rows[0];
@@ -131,7 +139,10 @@ pub fn deallocate_port(cippj_ids: Vec<i32>, postgres_client: Arc<tokio_postgres:
     });
 }
 
-pub async fn deallocate_port_by_container_id (container_ids: Vec<String>, postgres_client: Arc<tokio_postgres::Client> ){
+pub async fn deallocate_port_by_container_id(
+    container_ids: Vec<String>,
+    postgres_client: Arc<tokio_postgres::Client>,
+) {
     let _update_result = postgres_client.query_typed(
         format!("
                 UPDATE {cippj_table} set {cippj_in_use} = false

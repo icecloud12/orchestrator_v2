@@ -11,7 +11,7 @@ use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing_subscriber;
-use utils::orchestrator_utils::{create_instance, RouterDecoration, ORCHESTRATOR_PUBLIC_UUID};
+use utils::orchestrator_utils::{create_instance, RouterDecoration};
 use utils::{docker_utils, postgres_utils};
 use uuid::Uuid;
 mod controllers;
@@ -146,7 +146,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
-        let docker = docker_utils::connect();
+        let docker_connection = docker_utils::connect();
         let postgres_client = postgres_utils::connect(
             database_uri,
             database_user,
@@ -156,21 +156,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await;
 
-        docker_utils::deallocate_non_running(docker.clone(), postgres_client.clone()).await;
+        docker_utils::deallocate_non_running(docker_connection.clone(), postgres_client.clone())
+            .await;
         load_balancer_controller::init();
-        let orchestrator_uri: String = format!("https://{}:{}", &listening_address, &listening_port);
-
+        let orchestrator_uri: String =
+            format!("https://{}:{}", &listening_address, &listening_port);
         let uuid_parse_result = Uuid::parse_str(orchestrator_public_uuid.as_str());
         match uuid_parse_result {
             Ok(uuid_parsed) => {
-                ORCHESTRATOR_PUBLIC_UUID.get_or_init(|| uuid_parsed);
-                let instance_result: Option<reqwest::Client> =
-                    create_instance(&postgres_client).await;
-                // ORCHESTRATOR_PUBLIC_UUID.get_or_init(|| );
+                let orchestrator_public_uuid = Arc::new(uuid_parsed);
+                let instance_result: Option<(Arc<reqwest::Client>, Arc<i32>)> =
+                    create_instance(&postgres_client, &orchestrator_public_uuid).await;
                 //there is no way shape or form this would miss
                 // let mut rx: Receiver<SenderParameter> = request_channel_init();
                 if instance_result.is_some() {
-                    let reqwest_client = instance_result.unwrap();
+                    let (reqwest_client, orchestrator_instance_id) = instance_result.unwrap();
+                    let router_decoration = RouterDecoration {
+                        docker_connection,
+                        orchestrator_uri: Arc::new(orchestrator_uri),
+                        orchestrator_public_uuid,
+                        postgres_client,
+                        orchestrator_instance_id,
+                        reqwest_client,
+                    };
                     tracing::info!("Loading orchestrator routes");
                     let router = Router::new()
                         .route(
@@ -192,6 +200,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         format!("{}:{}", &listening_address, &listening_port).as_str(),
                         PathBuf::from("./src/certs/cert.crt"),
                         PathBuf::from("./src/certs/cert.key"),
+                        router_decoration,
                     )
                     .await;
                     if bind_result.is_err() {

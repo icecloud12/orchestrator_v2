@@ -89,7 +89,7 @@ impl ServiceLoadBalancer {
 
     pub async fn create_container(&mut self) -> Result<ServiceContainer, String> {
         let col =
-            container_controller::create_container(&self.docker_image_id, &self.exposed_port, self.decoration.docker_connection.clone(), self.decoration.postgres_client.clone(), &self.decoration.orchestrator_uri.as_ref()).await;
+            container_controller::create_container(&self.docker_image_id, &self.exposed_port, self.decoration.docker_connection.clone(), self.decoration.postgres_client.clone(), &self.decoration.orchestrator_uri.as_ref(), &self.decoration.orchestrator_public_uuid.as_ref()).await;
 
         match col {
             Ok(service_container) => {

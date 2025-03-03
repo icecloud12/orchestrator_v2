@@ -1,8 +1,6 @@
 use std::fmt::Display;
-use tokio::task::JoinError;
 use tokio_postgres::{types::Type, Error, Row};
-
-use crate::utils::orchestrator_utils::ORCHESTRATOR_PUBLIC_UUID;
+use uuid::Uuid;
 
 use super::{orchestrators::OrchestratorColumns, tables::ETables};
 
@@ -22,8 +20,10 @@ impl Display for OrchestratorInstanceColumns {
     }
 }
 
-pub async fn create_orchestrator_instance_query(postgres_client: &tokio_postgres::Client) -> Result<Vec<Row>, Error> {
-
+pub async fn create_orchestrator_instance_query(
+    postgres_client: &tokio_postgres::Client,
+    orchestrator_public_uuid: &Uuid,
+) -> Result<Vec<Row>, Error> {
     return postgres_client.query_typed(
         format!(
             "INSERT INTO {orchestrator_instance_table_name} ({col_orchestrator_fk}) VALUES ((SELECT {orchestrator_id} from {orchestrator_table} where {public_uuid} = $1)) RETURNING {orchestrator_instance_id}",
@@ -36,7 +36,7 @@ pub async fn create_orchestrator_instance_query(postgres_client: &tokio_postgres
         )
         .as_str(),
         &[
-            (ORCHESTRATOR_PUBLIC_UUID.get().unwrap(), Type::UUID)
+            (orchestrator_public_uuid, Type::UUID)
         ],
     ).await;
 }
