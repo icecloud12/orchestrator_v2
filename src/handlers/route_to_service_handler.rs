@@ -31,7 +31,7 @@ pub async fn route_to_service_handler(
 ) -> Result<(), Box<dyn Error>> {
     tracing::info!("Intercepting request");
     let resolved_service: Result<(Option<ServiceRoute>, Option<ServiceImage>), String> =
-        route_resolver(request.path.clone(), router_decoration.postgres_client.clone()).await;
+        route_resolver(&request.path, router_decoration.postgres_client.clone()).await;
 
     tracing::info!("Resolved request");
     match resolved_service {
@@ -66,8 +66,13 @@ pub async fn route_to_service_handler(
                     let request_method = Arc::new(request.method.clone());
 
                     tracing::info!("service_request_acceptance");
-                    let service_request_uuid: Arc<Uuid> =
-                        record_service_request_acceptance(request_path, request_method, router_decoration.postgres_client.clone(), router_decoration.orchestrator_instance_id.clone()).await;
+                    let service_request_uuid: Arc<Uuid> = record_service_request_acceptance(
+                        request_path,
+                        request_method,
+                        router_decoration.postgres_client.clone(),
+                        router_decoration.orchestrator_instance_id.clone(),
+                    )
+                    .await;
 
                     //queue_ing logic for await_load_balancers
                     let awaited_lb_hm = AWAITED_LOADBALANCERS.get().unwrap();
@@ -89,13 +94,14 @@ pub async fn route_to_service_handler(
                             exposed_port,
                             service_image,
                             &service_route.https,
-                            router_decoration.clone()
+                            router_decoration.clone(),
                         )
                         .await
                         .unwrap();
-                        tracing::info!("LB provisioned, acquiring lock");
+                        tracing::info!("LB provisioned");
 
                         let lb_mutex = LOADBALANCERS.get().unwrap();
+                        tracing::info!("acquiring lock");
                         let mut lb_hm = lb_mutex.lock().await;
                         let lb = lb_hm.get_mut(&lb_key).unwrap();
                         tracing::info!("lock acquired");
@@ -114,7 +120,7 @@ pub async fn route_to_service_handler(
                                             &container_public_port,
                                             &lb.https,
                                             router_decoration.postgres_client.clone(),
-                                            router_decoration.reqwest_client.clone()
+                                            router_decoration.reqwest_client.clone(),
                                         )
                                         .await;
                                         if !is_forward_success {
@@ -143,7 +149,9 @@ pub async fn route_to_service_handler(
                                                         insert_finalized_trace(
                                                             service_request_uuid,
                                                             500,
-                                                            router_decoration.postgres_client.clone()
+                                                            router_decoration
+                                                                .postgres_client
+                                                                .clone(),
                                                         )
                                                         .await;
                                                     }
@@ -155,7 +163,7 @@ pub async fn route_to_service_handler(
                                                 insert_finalized_trace(
                                                     service_request_uuid, //formatting why do you do this man
                                                     500,
-                                                    router_decoration.postgres_client.clone()
+                                                    router_decoration.postgres_client.clone(),
                                                 )
                                                 .await;
                                             }
@@ -167,7 +175,6 @@ pub async fn route_to_service_handler(
                                 if new_lb {
                                     match lb.create_container().await {
                                         Ok(new_container) => {
-                                            
                                             match new_container.start_container(docker).await {
                                                 Ok(_container_start_success) => {
                                                     tracing::info!(
@@ -188,7 +195,7 @@ pub async fn route_to_service_handler(
                                                     insert_finalized_trace(
                                                         service_request_uuid, //formatting why do you do this man
                                                         500,
-                                                        router_decoration.postgres_client.clone()
+                                                        router_decoration.postgres_client.clone(),
                                                     )
                                                     .await;
                                                 }
@@ -200,7 +207,7 @@ pub async fn route_to_service_handler(
                                             insert_finalized_trace(
                                                 service_request_uuid, //formatting why do you do this man
                                                 500,
-                                                router_decoration.postgres_client.clone()
+                                                router_decoration.postgres_client.clone(),
                                             )
                                             .await;
                                         }
@@ -275,7 +282,7 @@ pub async fn container_ready(
                         insert_finalized_trace(
                             service_request_uuid,
                             StatusCode::SERVICE_UNAVAILABLE.as_u16() as i32,
-                            router_decoration.postgres_client.clone()
+                            router_decoration.postgres_client.clone(),
                         )
                         .await;
                     } else {
@@ -287,7 +294,7 @@ pub async fn container_ready(
                             &container_port,
                             &service_load_balancer.https,
                             router_decoration.postgres_client.clone(),
-                            router_decoration.reqwest_client.clone()
+                            router_decoration.reqwest_client.clone(),
                         )
                         .await;
                         if !is_forward_success {

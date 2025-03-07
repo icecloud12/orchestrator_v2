@@ -1,20 +1,24 @@
 use std::sync::Arc;
 
 use crate::{
-    db::{images::ServiceImageColumns, routes::{route_resolution_query, ServiceRouteColumns}},
+    db::{
+        images::ServiceImageColumns,
+        routes::{route_resolution_query, ServiceRouteColumns},
+    },
     models::{service_image_models::ServiceImage, service_route_model::ServiceRoute},
 };
 
 pub async fn route_resolver(
-    uri_string: String,
-    postgres_client: Arc<tokio_postgres::Client>
+    uri_string: &String,
+    postgres_client: Arc<tokio_postgres::Client>,
 ) -> Result<(Option<ServiceRoute>, Option<ServiceImage>), String> {
     let route_result = route_resolution_query(uri_string, postgres_client).await;
     match route_result {
         Ok(rows) => {
             let service_route: (Option<ServiceRoute>, Option<ServiceImage>) = if !rows.is_empty() {
                 let row = &rows[0];
-                let image_id = row.get::<&str, i32>(ServiceRouteColumns::IMAGE_FK.to_string().as_str());
+                let image_id =
+                    row.get::<&str, i32>(ServiceRouteColumns::IMAGE_FK.to_string().as_str());
                 let service_route = Some(ServiceRoute {
                     id: row.get::<&str, i32>("r_id"),
                     image_fk: Arc::new(image_id.clone()),
@@ -25,11 +29,12 @@ pub async fn route_resolver(
                     ),
                     segments: row
                         .get::<&str, i32>(ServiceRouteColumns::SEGMENTS.to_string().as_str()),
-                    https: row.get::<&str, bool>(ServiceRouteColumns::HTTPS.to_string().as_str())
+                    https: row.get::<&str, bool>(ServiceRouteColumns::HTTPS.to_string().as_str()),
                 });
                 let service_image = Some(ServiceImage {
                     id: image_id,
-                    docker_image_id: row.get::<&str, String>(ServiceImageColumns::DOCKER_IMAGE_ID.as_str()),
+                    docker_image_id: row
+                        .get::<&str, String>(ServiceImageColumns::DOCKER_IMAGE_ID.as_str()),
                 });
                 (service_route, service_image)
             } else {
