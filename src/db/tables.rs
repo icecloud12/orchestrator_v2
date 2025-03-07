@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-pub enum ETables{
+pub enum ETables {
     CONTAINER_INSTANCE_PORT_POOL_JUNCTION,
     LOAD_BALANCER_CONTAINER_JUNCTION,
     ORCHESTRATORS,
@@ -10,7 +10,8 @@ pub enum ETables{
     SERVICE_CONTAINER,
     SERVICE_LOADBALANCERS,
     SERVICE_REQUEST,
-    REQUEST_TRACES
+    REQUEST_TRACES,
+    SERVICE_IMAGE,
 }
 
 impl Display for ETables {
@@ -28,7 +29,7 @@ impl Display for ETables {
             Self::SERVICE_LOADBALANCERS => write!(f, "load_balancers"),
             Self::LOAD_BALANCER_CONTAINER_JUNCTION => write!(f, "load_balancer_container_junction"),
             Self::REQUEST_TRACES => write!(f, "request_traces"),
+            Self::SERVICE_IMAGE => write!(f, "images"),
         }
     }
 }
-

@@ -178,7 +178,7 @@ pub async fn route_to_service_handler(
                                             match new_container.start_container(docker).await {
                                                 Ok(_container_start_success) => {
                                                     tracing::info!(
-                                                        "Queueing container:{}",
+                                                        "Queueing container:#{}",
                                                         &new_container.id
                                                     );
                                                     lb.queue_request(
